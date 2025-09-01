@@ -24,6 +24,12 @@
     "handle_too_short": "Handle is too short",
     "handle_too_long": "Handle is too long",
     "handle_banned": "This handle is not allowed",
-    "chars": "chars"
+    "chars": "chars",
+    "settings": "settings",
+    "profile": "profile",
+    "billing": "billing",
+    "email_sent": "Email sent!",
+    "check_your_inbox": "Check your inbox to confirm your email.",
+    "go_to_email": "Go to your email"
   }
   

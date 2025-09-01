@@ -10,17 +10,17 @@ const MIN_LEN = 3
 const MAX_LEN = 20
 const HANDLE_REGEX = /^[a-z0-9_-]+$/
 const BANNED: string[] = [
-    'admin',
-    'root',
-    'support',
-    'moderator',
-    'hitler',
-    'nazi',
-    'kkk',
-    'isis',
-    'nigger'
-  ]
-  
+  'admin',
+  'root',
+  'support',
+  'moderator',
+  'hitler',
+  'nazi',
+  'kkk',
+  'isis',
+  'nigger'
+]
+
 export default function RegisterPage() {
   const router = useRouter()
   const supabase = createClient()
@@ -33,6 +33,7 @@ export default function RegisterPage() {
 
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [emailSent, setEmailSent] = useState(false)
 
   type HandleStatus = 'idle' | 'checking' | 'available' | 'taken'
   const [handleStatus, setHandleStatus] = useState<HandleStatus>('idle')
@@ -40,7 +41,16 @@ export default function RegisterPage() {
   const lastRequested = useRef<string>('')
   const lastValidated = useRef<string>('')
 
-  // validate handle before DB check
+  // If already logged in, go dashboard
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession()
+      if (data.session) router.replace('/dashboard')
+    }
+    checkSession()
+  }, [router, supabase])
+
+  // local validation error
   const handleError: string | null = (() => {
     if (!handle) return null
     if (handle.length < MIN_LEN) return t('handle_too_short')
@@ -50,20 +60,16 @@ export default function RegisterPage() {
     return null
   })()
 
-  // check availability
+  // availability check
   useEffect(() => {
     if (!handle || handleError) {
       setHandleStatus('idle')
       return
     }
-
-    // skip re-check if this handle was already validated
     if (
       lastValidated.current === handle &&
       (handleStatus === 'available' || handleStatus === 'taken')
-    ) {
-      return
-    }
+    ) return
 
     setHandleStatus('checking')
     const current = handle
@@ -76,8 +82,7 @@ export default function RegisterPage() {
         .eq('handle', current)
         .maybeSingle()
 
-      if (lastRequested.current !== current) return // stale result
-
+      if (lastRequested.current !== current) return
       if (error) {
         console.error(error)
         setHandleStatus('idle')
@@ -85,11 +90,11 @@ export default function RegisterPage() {
       }
 
       setHandleStatus(data ? 'taken' : 'available')
-      lastValidated.current = current // remember this result
-    }, 500)
+      lastValidated.current = current
+    }, 450)
 
     return () => clearTimeout(timer)
-  }, [handle, handleError, supabase])
+  }, [handle, handleError, handleStatus, supabase])
 
   const passwordsMatch = confirmPassword === '' || password === confirmPassword
 
@@ -97,42 +102,59 @@ export default function RegisterPage() {
     e.preventDefault()
     setError(null)
 
-    if (!passwordsMatch) {
-      setError(t('passwords_do_not_match'))
-      return
-    }
-    if (handleError) {
-      setError(handleError)
-      return
-    }
-    if (handleStatus !== 'available') {
-      setError(t('handle_not_available'))
-      return
-    }
+    if (!passwordsMatch) return setError(t('passwords_do_not_match'))
+    if (handleError) return setError(handleError)
+    if (handleStatus !== 'available') return setError(t('handle_not_available'))
 
     setLoading(true)
 
-    const { data, error: signUpError } = await supabase.auth.signUp({ email, password })
+    const origin =
+      typeof window !== 'undefined'
+        ? window.location.origin
+        : process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+
+    // Create auth user, send email link to /auth/callback
+    const { error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { handle }, // trigger will copy this into profiles.handle
+        emailRedirectTo: `${origin}/auth/callback`,
+      },
+    })
+
     if (signUpError) {
       setError(signUpError.message)
       setLoading(false)
       return
     }
 
-    if (data.user) {
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ handle })
-        .eq('id', data.user.id)
+    setLoading(false)
+    setEmailSent(true)
+  }
 
-      if (updateError) {
-        setError(updateError.message)
-        setLoading(false)
-        return
-      }
-    }
-
-    router.push('/dashboard')
+  if (emailSent) {
+    const emailDomain = email.split('@')[1] || 'gmail.com'
+    return (
+      <div className="min-h-screen flex items-center justify-center px-6">
+        <div className="max-w-md w-full bg-zinc-900 p-8 rounded-xl shadow-xl text-center">
+          <h2 className="text-2xl text-white font-semibold mb-4">
+            {t('email_sent') || 'Email sent!'}
+          </h2>
+          <p className="text-gray-400 mb-6">
+            {t('check_your_inbox') || 'Check your inbox to confirm your email.'}
+          </p>
+          <a
+            href={`https://${emailDomain}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block px-6 py-3 bg-white text-black font-semibold rounded hover:bg-gray-200 transition"
+          >
+            {t('go_to_email') || `Go to ${emailDomain}`}
+          </a>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -174,7 +196,6 @@ export default function RegisterPage() {
             }`}
             required
           />
-
           <p className="text-xs text-gray-500 mt-1">
             {MIN_LEN}-{MAX_LEN} {t('chars') || 'chars'}. a-z, 0-9, _ -
           </p>
@@ -201,7 +222,7 @@ export default function RegisterPage() {
           required
         />
 
-        {/* Confirm password */}
+        {/* Confirm */}
         <input
           type="password"
           placeholder={t('confirm_password')}

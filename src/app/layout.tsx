@@ -1,16 +1,22 @@
-import './globals.css'
-import Header from '@/components/Header'
-import Footer from '@/components/Footer'
-import { LanguageProvider } from '@/context/LanguageProvider'
+// src/app/layout.tsx
+'use client'
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+import './globals.css'
+import { LanguageProvider } from '@/context/LanguageProvider'
+import { ProfileProvider } from '@/context/ProfileProvider'
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
     <html lang="en">
-      <body className="bg-black text-white min-h-screen flex flex-col">
+      <body>
         <LanguageProvider>
-          <Header />
-          <main className="flex-1 pt-20">{children}</main>
-          <Footer />
+          <ProfileProvider>
+            {children}
+          </ProfileProvider>
         </LanguageProvider>
       </body>
     </html>

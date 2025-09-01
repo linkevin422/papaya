@@ -24,6 +24,12 @@
     "handle_too_short": "用戶名太短",
     "handle_too_long": "用戶名太長",
     "handle_banned": "此用戶名不允許使用",
-    "chars": "字元"
+    "chars": "字元",
+    "settings": "設定",
+    "profile": "個人頁面",
+    "billing": "升級",
+    "email_sent": "已發送驗證信！",
+    "check_your_inbox": "請前往信箱確認您的電子郵件。",
+    "go_to_email": "前往信箱"
   }
   
