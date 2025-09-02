@@ -13,36 +13,52 @@ type Props = {
     source_id: string
     target_id: string
     type: string
-    direction: string
+    direction: string | null
   }
   nodes: { id: string; name: string }[]
   refresh: () => void
 }
 
-export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props) {
-  const supabase = createClient()
-  const [type, setType] = useState(edge.type)
-  const [direction, setDirection] = useState(edge.direction)
+const supabase = createClient()
 
-  const sourceName = nodes.find((n) => n.id === edge.source_id)?.name || 'Source'
-  const targetName = nodes.find((n) => n.id === edge.target_id)?.name || 'Target'
+export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props) {
+  const [type, setType] = useState(edge.type)
+  const [dir, setDir] = useState<'a->b' | 'b->a' | 'both' | 'none'>(
+    (edge.direction as any) || 'a->b'
+  )
+
+  useEffect(() => {
+    setType(edge.type)
+    setDir(((edge.direction as any) || 'a->b') as any)
+  }, [edge])
+
+  const nameOf = (id: string) => nodes.find((n) => n.id === id)?.name || 'Unknown'
+  const aName = nameOf(edge.source_id)
+  const bName = nameOf(edge.target_id)
 
   const handleSave = async () => {
-    await supabase.from('edges').update({ type, direction }).eq('id', edge.id)
-    refresh()
+    // Build update payload. Swap source/target when choosing B->A so animation direction matches.
+    let update: any = { type, direction: dir }
+
+    if (dir === 'a->b') {
+      update.source_id = edge.source_id
+      update.target_id = edge.target_id
+    } else if (dir === 'b->a') {
+      update.source_id = edge.target_id
+      update.target_id = edge.source_id
+    } // both/none keep current endpoints
+
+    await supabase.from('edges').update(update).eq('id', edge.id)
+
+    await refresh()
     onClose()
   }
 
   const handleDelete = async () => {
     await supabase.from('edges').delete().eq('id', edge.id)
-    refresh()
+    await refresh()
     onClose()
   }
-
-  useEffect(() => {
-    setType(edge.type)
-    setDirection(edge.direction)
-  }, [edge])
 
   return (
     <Dialog open={open} onClose={onClose} className="fixed inset-0 z-50">
@@ -54,13 +70,13 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
           <div>
             <label className="text-sm">Direction</label>
             <select
-              value={direction}
-              onChange={(e) => setDirection(e.target.value)}
+              value={dir}
+              onChange={(e) => setDir(e.target.value as any)}
               className="w-full bg-black border border-zinc-700 text-white rounded-md px-3 py-2 mt-1"
             >
-              <option value={`${sourceName} → ${targetName}`}>{sourceName} → {targetName}</option>
-              <option value={`${targetName} → ${sourceName}`}>{targetName} → {sourceName}</option>
-              <option value="↔">↔ Both directions</option>
+              <option value="a->b">{aName} → {bName}</option>
+              <option value="b->a">{bName} → {aName}</option>
+              <option value="both">↔ Both directions</option>
               <option value="none">No Direction</option>
             </select>
           </div>
@@ -79,10 +95,7 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
           </div>
 
           <div className="flex justify-between pt-4">
-            <Button
-              onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700 text-white"
-            >
+            <Button onClick={handleDelete} className="bg-red-600 hover:bg-red-700 text-white">
               Delete
             </Button>
             <div className="flex gap-2">

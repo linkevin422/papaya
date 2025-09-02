@@ -55,20 +55,18 @@ export default function FlowCanvas({
         markerEnd: { type: MarkerType.ArrowClosed },
         animated: true,
         style: { stroke: '#e5e7eb' },
-        data: { direction: `${connection.source} → ${connection.target}` },
+        data: { direction: 'a->b' },
       }
-
-      setEdgesState((eds) => addEdge(newEdge, eds))
-
+      
       await supabase.from('edges').insert({
         id: newEdge.id,
         flow_id: flowId,                 // ✅ correct flow id
         source_id: connection.source,
         target_id: connection.target,
         type: 'traffic',
-        direction: newEdge.data.direction as string,
+        direction: 'a->b',
       })
-
+      
       refresh()
     },
     [flowId, setEdgesState, refresh]
