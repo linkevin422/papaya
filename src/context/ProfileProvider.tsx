@@ -8,6 +8,7 @@ import {
   ReactNode,
 } from 'react'
 import { createClient } from '@/lib/supabase'
+import type { AuthChangeEvent, Session } from '@supabase/supabase-js'
 
 type Profile = {
   id: string
@@ -33,22 +34,20 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
 
   const fetchProfile = async () => {
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
+      const { data: sessionData } = await supabase.auth.getSession()
+      const session = sessionData.session
 
       if (!session?.user) {
         setProfile(null)
-        return
+      } else {
+        const { data } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single()
+
+        setProfile(data ?? null)
       }
-
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .single()
-
-      setProfile(data ?? null)
     } catch (err) {
       console.error('Profile fetch error:', err)
       setProfile(null)
@@ -58,12 +57,14 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
+    let isMounted = true
+
     fetchProfile()
 
     const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (_event: AuthChangeEvent, session: Session | null) => {
         if (!session?.user) {
-          setProfile(null)
+          if (isMounted) setProfile(null)
         } else {
           fetchProfile()
         }
@@ -71,6 +72,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     )
 
     return () => {
+      isMounted = false
       listener?.subscription.unsubscribe()
     }
   }, [])
