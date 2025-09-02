@@ -1,9 +1,10 @@
-// src/app/layout.tsx
 'use client'
 
 import './globals.css'
 import { LanguageProvider } from '@/context/LanguageProvider'
 import { ProfileProvider } from '@/context/ProfileProvider'
+import Header from '@/components/Header'
+import Footer from '@/components/Footer'
 
 export default function RootLayout({
   children,
@@ -12,10 +13,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>
+      <body className="bg-black text-white antialiased min-h-screen flex flex-col">
         <LanguageProvider>
           <ProfileProvider>
-            {children}
+            <Header />
+            <main className="pt-16 flex-1">{children}</main>
+            <Footer />
           </ProfileProvider>
         </LanguageProvider>
       </body>

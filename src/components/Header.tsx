@@ -1,190 +1,117 @@
+// /src/components/Header.tsx
 'use client'
 
-import { useRef, useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase'
-import { useLanguage } from '@/context/LanguageProvider'
 import { useProfile } from '@/context/ProfileProvider'
+import { useLanguage } from '@/context/LanguageProvider'
+import { createClient } from '@/lib/supabase'
+import { useEffect, useRef, useState } from 'react'
 
 export default function Header() {
-  const router = useRouter()
-  const supabase = createClient()
+  const { profile } = useProfile()
   const { t } = useLanguage()
-  const { profile, loading } = useProfile()
-
+  const supabase = createClient()
   const [menuOpen, setMenuOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement | null>(null)
-  const buttonRef = useRef<HTMLButtonElement | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
 
-  // Close dropdown on outside click / Escape
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    window.location.href = '/login'
+  }
+
+  // Close dropdown on outside click
   useEffect(() => {
-    const onClick = (e: MouseEvent) => {
-      if (!menuOpen) return
-      const target = e.target as Node
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(target) &&
-        buttonRef.current &&
-        !buttonRef.current.contains(target)
-      ) {
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setMenuOpen(false)
       }
     }
-    const onKey = (e: KeyboardEvent) => {
+    function handleEscape(e: KeyboardEvent) {
       if (e.key === 'Escape') setMenuOpen(false)
     }
-    window.addEventListener('mousedown', onClick)
-    window.addEventListener('keydown', onKey)
+    if (menuOpen) {
+      document.addEventListener('mousedown', handleClick)
+      document.addEventListener('keydown', handleEscape)
+    }
     return () => {
-      window.removeEventListener('mousedown', onClick)
-      window.removeEventListener('keydown', onKey)
+      document.removeEventListener('mousedown', handleClick)
+      document.removeEventListener('keydown', handleEscape)
     }
   }, [menuOpen])
 
-  const loggedIn = !!profile
-
-  const label =
-    profile?.handle ||
-    profile?.name ||
-    profile?.email?.split('@')[0] ||
-    'Account'
-
-  const plan = profile?.subscription_level || 'basic'
-
   return (
-    <header className="w-full fixed top-0 z-50 bg-black text-white px-6 py-4 flex items-center justify-between antialiased">
-      {/* Logo */}
-      <Link href="/" className="text-lg font-semibold tracking-tight">
-        Papaya
-      </Link>
+    <header className="fixed top-0 left-0 right-0 z-20 border-b border-neutral-800 bg-black/80 backdrop-blur-sm">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
+        {/* Logo */}
+        <Link href="/" className="font-semibold">
+          Papaya
+        </Link>
 
-      {/* Right side */}
-      <div className="flex items-center gap-4">
-        {loading ? (
-          <div className="h-8 w-24 rounded-full bg-neutral-900 border border-neutral-800 animate-pulse" />
-        ) : !loggedIn ? (
-          <>
-            <Link href="/login" className="text-sm font-medium text-gray-300 hover:text-white">
-              {t('login')}
-            </Link>
-            <Link
-              href="/register"
-              className="text-sm font-semibold bg-white text-black px-4 py-1.5 rounded-full hover:bg-gray-200 transition"
-            >
-              {t('signup')}
-            </Link>
-          </>
-        ) : (
-          <div className="relative">
+        {/* Right side */}
+        {profile ? (
+          <div className="relative" ref={menuRef}>
             <button
-              ref={buttonRef}
               onClick={() => setMenuOpen((o) => !o)}
-              aria-haspopup="menu"
-              aria-expanded={menuOpen}
-              className="group flex items-center gap-2 rounded-full bg-neutral-900 px-3 py-1.5 border border-neutral-800 hover:border-neutral-700"
+              className="flex items-center gap-2 rounded-lg px-3 py-1.5 hover:bg-neutral-900"
             >
-              <span className="max-w-[160px] truncate text-sm text-gray-200 font-medium">
-                {label}
-              </span>
-              <span className="text-[10px] rounded-full px-2 py-0.5 bg-neutral-800 text-gray-300 capitalize">
-                {plan}
+              <span className="text-sm">
+                {profile.handle ?? profile.email}
               </span>
               <svg
-                width="16"
-                height="16"
-                viewBox="0 0 20 20"
-                className="opacity-70 group-hover:opacity-100"
-                aria-hidden="true"
+                className={`h-4 w-4 transition-transform ${
+                  menuOpen ? 'rotate-180 opacity-100' : 'opacity-70'
+                }`}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
               >
-                <path d="M5 7l5 6 5-6H5z" fill="currentColor" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
               </svg>
             </button>
 
             {menuOpen && (
-              <div
-                ref={menuRef}
-                role="menu"
-                className="absolute right-0 mt-2 w-56 rounded-xl border border-neutral-800 bg-neutral-950 shadow-lg overflow-hidden"
-              >
-                <div className="px-3 py-2 text-xs text-gray-400 flex items-center gap-2">
-                  <span className="font-medium text-gray-200">{label}</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-800 capitalize">
-                    {plan}
-                  </span>
-                </div>
-                <div className="h-px bg-neutral-800" />
-
-                <MenuItem href="/dashboard" onClick={() => setMenuOpen(false)}>
+              <div className="absolute right-0 mt-2 w-48 overflow-hidden rounded-lg border border-neutral-800 bg-neutral-950 shadow-xl">
+                <Link
+                  href="/dashboard"
+                  className="block px-4 py-2 text-sm hover:bg-neutral-900"
+                  onClick={() => setMenuOpen(false)}
+                >
                   {t('dashboard')}
-                </MenuItem>
-                <MenuItem href="/dashboard/settings" onClick={() => setMenuOpen(false)}>
-                  {t('settings')} · {t('profile')}
-                </MenuItem>
-                <MenuItem href="/dashboard/billing" onClick={() => setMenuOpen(false)}>
-                  {t('billing') || 'Billing / Upgrade'}
-                </MenuItem>
-
-                <div className="h-px bg-neutral-800" />
-
-                <MenuButton
-                  onClick={async () => {
-                    await supabase.auth.signOut()
-                    setMenuOpen(false)
-                    router.push('/')
-                  }}
-                  destructive
+                </Link>
+                <Link
+                  href="/dashboard/settings"
+                  className="block px-4 py-2 text-sm hover:bg-neutral-900"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  {t('settings')}
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-neutral-900"
                 >
                   {t('logout')}
-                </MenuButton>
+                </button>
               </div>
             )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-4">
+            <Link
+              href="/login"
+              className="text-sm opacity-80 hover:opacity-100"
+            >
+              {t('login')}
+            </Link>
+            <Link
+              href="/register"
+              className="rounded-full bg-white px-4 py-1.5 text-sm font-semibold text-black hover:bg-gray-200"
+            >
+              {t('signup')}
+            </Link>
           </div>
         )}
       </div>
     </header>
-  )
-}
-
-function MenuItem({
-  href,
-  children,
-  onClick,
-}: {
-  href: string
-  children: React.ReactNode
-  onClick?: () => void
-}) {
-  return (
-    <Link
-      href={href}
-      onClick={onClick}
-      role="menuitem"
-      className="block px-3 py-2 text-sm text-gray-200 hover:bg-neutral-900"
-    >
-      {children}
-    </Link>
-  )
-}
-
-function MenuButton({
-  children,
-  onClick,
-  destructive = false,
-}: {
-  children: React.ReactNode
-  onClick?: () => void
-  destructive?: boolean
-}) {
-  return (
-    <button
-      role="menuitem"
-      onClick={onClick}
-      className={`w-full text-left px-3 py-2 text-sm hover:bg-neutral-900 ${
-        destructive ? 'text-red-400 hover:text-red-300' : 'text-gray-200'
-      }`}
-    >
-      {children}
-    </button>
   )
 }
