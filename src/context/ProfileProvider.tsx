@@ -4,6 +4,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   ReactNode,
 } from 'react'
@@ -31,13 +32,19 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const supabase = createClient()
   const [profile, setProfile] = useState<Profile | null>(null)
   const [initialized, setInitialized] = useState(false)
+  const mountedRef = useRef(false)
 
   const fetchProfile = async () => {
     try {
-      const { data: sessionData } = await supabase.auth.getSession()
+      console.log('[debug] fetching session...')
+      const { data: sessionData, error } = await supabase.auth.getSession()
+      console.log('[debug] sessionData:', sessionData)
+      console.log('[debug] session error:', error)
+
       const session = sessionData.session
 
       if (!session?.user) {
+        console.log('[debug] no session user, setting profile null')
         setProfile(null)
       } else {
         const { data } = await supabase
@@ -45,34 +52,36 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
           .select('*')
           .eq('id', session.user.id)
           .single()
-
         setProfile(data ?? null)
       }
     } catch (err) {
-      console.error('Profile fetch error:', err)
+      console.error('[debug] fetchProfile error:', err)
       setProfile(null)
     } finally {
+      console.log('[debug] initialized true')
       setInitialized(true)
     }
   }
 
   useEffect(() => {
-    let isMounted = true
+    if (mountedRef.current) return
+    mountedRef.current = true
 
     fetchProfile()
 
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event: AuthChangeEvent, session: Session | null) => {
         if (!session?.user) {
-          if (isMounted) setProfile(null)
+          setProfile(null)
         } else {
-          fetchProfile()
+          if (session.user.id !== profile?.id) {
+            fetchProfile()
+          }
         }
       }
     )
 
     return () => {
-      isMounted = false
       listener?.subscription.unsubscribe()
     }
   }, [])
