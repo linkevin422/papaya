@@ -19,6 +19,12 @@ import { createClient } from '@/lib/supabase'
 
 const supabase = createClient()
 
+const EDGE_COLOR: Record<string, string> = {
+  Income:  '#22c55e',
+  Traffic: '#60a5fa',
+  Fuel:    '#f97316',
+}
+
 type Props = {
   flowId: string
   nodes: Node[]
@@ -39,7 +45,6 @@ export default function FlowCanvas({
   const [nodesState, setNodesState, onNodesChange] = useNodesState(nodes)
   const [edgesState, setEdgesState, onEdgesChange] = useEdgesState(edges)
 
-  // keep local RF state in sync with props
   useEffect(() => { setNodesState(nodes) }, [nodes, setNodesState])
   useEffect(() => { setEdgesState(edges) }, [edges, setEdgesState])
 
@@ -47,26 +52,33 @@ export default function FlowCanvas({
     async (connection: Connection) => {
       if (!connection.source || !connection.target) return
 
+      // default new link: Traffic, forward
+      const type = 'Traffic'
+      const stroke = EDGE_COLOR[type] || '#e5e7eb'
+
       const newEdge: Edge = {
         id: `${connection.source}-${connection.target}-${Date.now()}`,
         source: connection.source,
         target: connection.target,
-        label: 'traffic',
-        markerEnd: { type: MarkerType.ArrowClosed },
+        label: undefined,
+        markerEnd: { type: MarkerType.ArrowClosed, color: stroke },
         animated: true,
-        style: { stroke: '#e5e7eb' },
-        data: { direction: 'a->b' },
+        style: { stroke, strokeWidth: 2 },
+        data: { direction: 'a->b', linkType: type },
       }
-      
+
+      setEdgesState((eds) => addEdge(newEdge, eds))
+
       await supabase.from('edges').insert({
         id: newEdge.id,
-        flow_id: flowId,                 // ✅ correct flow id
+        flow_id: flowId,
         source_id: connection.source,
         target_id: connection.target,
-        type: 'traffic',
+        type,
         direction: 'a->b',
+        label: null,
       })
-      
+
       refresh()
     },
     [flowId, setEdgesState, refresh]
@@ -74,12 +86,10 @@ export default function FlowCanvas({
 
   const onNodeDragStop = useCallback(
     async (_e: any, node: Node) => {
-      // persist position
       await supabase
         .from('nodes')
         .update({ x: node.position.x, y: node.position.y })
         .eq('id', node.id)
-
       refresh()
     },
     [refresh]

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Dialog } from '@headlessui/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,25 +13,35 @@ type Props = {
   refresh: () => void
 }
 
+const NODE_TYPES = [
+  'Bank',
+  'Store',
+  'Product',
+  'Platform',
+  'Job',
+  'Investment',
+  'Sponsor',
+]
+
 export default function NodeModal({ open, onClose, node, refresh }: Props) {
   const supabase = createClient()
   const [name, setName] = useState(node.name)
-  const [type, setType] = useState(node.type || 'platform')
+  const [type, setType] = useState(node.type || 'Platform')
 
   useEffect(() => {
     setName(node.name)
-    setType(node.type || 'platform')
+    setType(node.type || 'Platform')
   }, [node])
 
   const handleSave = async () => {
     await supabase.from('nodes').update({ name, type }).eq('id', node.id)
-    refresh()
+    await refresh()
     onClose()
   }
 
   const handleDelete = async () => {
     await supabase.from('nodes').delete().eq('id', node.id)
-    refresh()
+    await refresh()
     onClose()
   }
 
@@ -52,19 +62,14 @@ export default function NodeModal({ open, onClose, node, refresh }: Props) {
               onChange={(e) => setType(e.target.value)}
               className="bg-zinc-800 text-white rounded px-3 py-2 w-full"
             >
-              <option value="bank">Bank</option>
-              <option value="platform">Platform</option>
-              <option value="store">Store</option>
-              <option value="income">Income</option>
-              <option value="other">Other</option>
+              {NODE_TYPES.map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
             </select>
           </div>
 
           <div className="flex justify-between pt-4">
-            <Button
-              onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700 text-white"
-            >
+            <Button onClick={handleDelete} className="bg-red-600 hover:bg-red-700 text-white">
               Delete
             </Button>
             <div className="flex gap-2">

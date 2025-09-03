@@ -10,30 +10,80 @@ import AddNodeForm from './AddNodeForm'
 import { MarkerType } from 'reactflow'
 import { Dialog } from '@headlessui/react'
 import { Button } from '@/components/ui/button'
+import {
+  Landmark,
+  Store as StoreIcon,
+  Package,
+  Megaphone,
+  Briefcase,
+  TrendingUp,
+  HandCoins,
+  Circle
+} from 'lucide-react'
 
 const supabase = createClient()
 
-type Flow = {
-  id: string
-  name: string
-  user_id: string
-  created_at: string
-}
-
-type NodeData = {
-  id: string
-  name: string
-  type?: string
-  x?: number
-  y?: number
-}
-
+type Flow = { id: string; name: string; user_id: string; created_at: string }
+type NodeData = { id: string; name: string; type?: string; x?: number; y?: number }
 type EdgeData = {
   id: string
+  flow_id: string
   source_id: string
   target_id: string
-  type: string
-  direction: string | null
+  type: string            // Income | Traffic | Fuel
+  direction: string | null // a->b | b->a | both | none
+  label?: string | null
+}
+
+/** Colors */
+const NODE_COLOR: Record<string, string> = {
+  Bank: '#10b981',
+  Store: '#f59e0b',
+  Product: '#8b5cf6',
+  Platform: '#3b82f6',
+  Job: '#06b6d4',
+  Investment: '#22c55e',
+  Sponsor: '#ec4899',
+}
+const EDGE_COLOR: Record<string, string> = {
+  Income: '#22c55e',
+  Traffic: '#60a5fa',
+  Fuel: '#f97316',
+}
+
+/** Icons */
+const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  Bank: Landmark,
+  Store: StoreIcon,
+  Product: Package,
+  Platform: Megaphone,
+  Job: Briefcase,
+  Investment: TrendingUp,
+  Sponsor: HandCoins,
+}
+
+/** Helpers */
+const normalizeType = (t?: string) => (t || '').trim()
+const normalizeDir = (d?: string | null): 'a->b' | 'b->a' | 'both' | 'none' => {
+  if (!d) return 'a->b'
+  const s = d.toLowerCase().trim()
+  if (s === 'a->b' || s.includes('a → b')) return 'a->b'
+  if (s === 'b->a' || s.includes('b → a')) return 'b->a'
+  if (s === 'both' || s.includes('↔')) return 'both'
+  if (s === 'none') return 'none'
+  return 'a->b'
+}
+
+/** Small label component with lucide icon */
+function NodeLabel({ name, type }: { name: string; type?: string }) {
+  const t = normalizeType(type)
+  const Icon = ICONS[t] || Circle
+  return (
+    <div className="flex items-center gap-2">
+      <Icon className="w-4 h-4" />
+      <span className="font-semibold">{name}</span>
+    </div>
+  )
 }
 
 export default function FlowPage() {
@@ -47,76 +97,41 @@ export default function FlowPage() {
   const [layingOut, setLayingOut] = useState(false)
 
   const fetchFlow = async () => {
-    const { data, error } = await supabase
-      .from('flows')
-      .select('*')
-      .eq('id', flowId)
-      .single()
-    if (!error) setFlow(data)
+    const { data } = await supabase.from('flows').select('*').eq('id', flowId).single()
+    if (data) setFlow(data)
   }
-
   const fetchNodes = async () => {
-    const { data } = await supabase
-      .from('nodes')
-      .select('*')
-      .eq('flow_id', flowId)
+    const { data } = await supabase.from('nodes').select('*').eq('flow_id', flowId)
     if (data) setNodes(data)
   }
-
   const fetchEdges = async () => {
-    const { data } = await supabase
-      .from('edges')
-      .select('*')
-      .eq('flow_id', flowId)
-    if (data) setEdges(data)
+    const { data } = await supabase.from('edges').select('*').eq('flow_id', flowId)
+    if (data) setEdges(data as any)
   }
-
-  const refreshCanvas = async () => {
-    await Promise.all([fetchNodes(), fetchEdges()])
-  }
+  const refreshCanvas = async () => { await Promise.all([fetchNodes(), fetchEdges()]) }
 
   useEffect(() => {
-    if (flowId) {
-      fetchFlow()
-      refreshCanvas()
-    }
+    if (flowId) { fetchFlow(); refreshCanvas() }
   }, [flowId])
 
-  // ====== AUTO-SORT (no deps) ======
-  const normalizeDir = (d: string | null | undefined): 'a->b' | 'b->a' | 'both' | 'none' => {
-    if (!d) return 'a->b'
-    const s = d.toLowerCase().trim()
-    if (s === 'a->b' || s.includes('a → b')) return 'a->b'
-    if (s === 'b->a' || s.includes('b → a')) return 'b->a'
-    if (s === 'both' || s.includes('↔')) return 'both'
-    if (s === 'none' || s === 'no' || s === 'nodirection') return 'none'
-    return 'a->b'
-  }
-
+  /** Auto-sort: simple layered layout by direction */
   const autoSort = async () => {
     if (!nodes.length) return
     setLayingOut(true)
 
-    // Build directed constraints from edges
-    const ids = nodes.map(n => n.id)
-    const idSet = new Set(ids)
     type Pair = { u: string; v: string }
     const directed: Pair[] = []
-
+    const idSet = new Set(nodes.map(n => n.id))
     for (const e of edges) {
-      const dir = normalizeDir(e.direction)
+      const dir = normalizeDir(e.direction || undefined)
       if (!idSet.has(e.source_id) || !idSet.has(e.target_id)) continue
       if (dir === 'a->b') directed.push({ u: e.source_id, v: e.target_id })
       else if (dir === 'b->a') directed.push({ u: e.target_id, v: e.source_id })
-      // 'both' and 'none' impose no ordering
     }
 
-    // Longest-path style ranking (iterative relax)
-    const rank = new Map<string, number>()
-    for (const n of nodes) rank.set(n.id, 0)
-
+    const rank = new Map<string, number>(nodes.map(n => [n.id, 0]))
     const N = nodes.length
-    for (let iter = 0; iter < N; iter++) {
+    for (let i = 0; i < N; i++) {
       let changed = false
       for (const { u, v } of directed) {
         const ru = rank.get(u)!; const rv = rank.get(v)!
@@ -125,19 +140,14 @@ export default function FlowPage() {
       if (!changed) break
     }
 
-    // Group by rank and assign positions
-    const H = 260 // horizontal spacing
-    const V = 160 // vertical spacing
-
+    const H = 260, V = 160
     const layers = new Map<number, string[]>()
-    for (const id of ids) {
-      const r = rank.get(id) ?? 0
+    for (const n of nodes) {
+      const r = rank.get(n.id) ?? 0
       const arr = layers.get(r) ?? []
-      arr.push(id)
+      arr.push(n.id)
       layers.set(r, arr)
     }
-
-    // Stable order within a layer: by name
     for (const [r, arr] of layers) {
       arr.sort((a, b) => {
         const na = nodes.find(n => n.id === a)?.name || ''
@@ -147,79 +157,68 @@ export default function FlowPage() {
       layers.set(r, arr)
     }
 
-    // Build new positions
     const updates: { id: string; x: number; y: number }[] = []
-    const minRank = Math.min(...Array.from(layers.keys()))
-    const maxRank = Math.max(...Array.from(layers.keys()))
-
+    const ranks = Array.from(layers.keys())
+    const minRank = Math.min(...ranks), maxRank = Math.max(...ranks)
     for (let r = minRank; r <= maxRank; r++) {
       const arr = layers.get(r) || []
       const k = arr.length
       const yStart = -((k - 1) * V) / 2
-      arr.forEach((id, i) => {
-        const x = r * H
-        const y = yStart + i * V
-        updates.push({ id, x, y })
-      })
+      arr.forEach((id, i) => updates.push({ id, x: r * H, y: yStart + i * V }))
     }
 
-    // Persist to DB
-    await Promise.all(
-      updates.map(u =>
-        supabase.from('nodes').update({ x: u.x, y: u.y }).eq('id', u.id)
-      )
-    )
-
-    // Reload
+    await Promise.all(updates.map(u => supabase.from('nodes').update({ x: u.x, y: u.y }).eq('id', u.id)))
     await refreshCanvas()
     setLayingOut(false)
   }
-  // ====== END AUTO-SORT ======
 
-  // map DB rows -> ReactFlow nodes/edges
+  /** ReactFlow nodes/edges */
   const rfNodes = useMemo(
     () =>
-      nodes.map((n) => ({
-        id: n.id,
-        data: { label: n.name },
-        type: 'default',
-        position: {
-          x: typeof n.x === 'number' ? n.x : Math.random() * 300,
-          y: typeof n.y === 'number' ? n.y : Math.random() * 300,
-        },
-        style: {
-          backgroundColor:
-            n.type === 'bank'
-              ? '#10b981'
-              : n.type === 'traffic'
-              ? '#3b82f6'
-              : '#f59e0b',
-          color: 'white',
-          padding: 10,
-          borderRadius: 6,
-        },
-      })),
+      nodes.map((n) => {
+        const t = normalizeType(n.type)
+        const bg = NODE_COLOR[t] || '#64748b'
+        return {
+          id: n.id,
+          data: { label: <NodeLabel name={n.name} type={n.type} /> },
+          type: 'default',
+          position: {
+            x: typeof n.x === 'number' ? n.x : Math.random() * 300,
+            y: typeof n.y === 'number' ? n.y : Math.random() * 300,
+          },
+          style: {
+            backgroundColor: bg,
+            color: 'white',
+            padding: 10,
+            borderRadius: 12,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            fontWeight: 600,
+          },
+        }
+      }),
     [nodes]
   )
 
   const rfEdges = useMemo(
     () =>
       edges.map((e) => {
-        const dir = normalizeDir(e.direction)
+        const dir = normalizeDir(e.direction || undefined)
         const isBoth = dir === 'both'
         const isNone = dir === 'none'
+        const stroke = EDGE_COLOR[normalizeType(e.type)] || '#e5e7eb'
         return {
           id: e.id,
           source: e.source_id,
           target: e.target_id,
-          label: e.type,
+          label: e.label || undefined,
           animated: !isBoth && !isNone,
-          markerStart: isBoth ? { type: MarkerType.ArrowClosed } : undefined,
-          markerEnd: isNone ? undefined : { type: MarkerType.ArrowClosed },
+          markerStart: isBoth ? { type: MarkerType.ArrowClosed, color: stroke } : undefined,
+          markerEnd: isNone ? undefined : { type: MarkerType.ArrowClosed, color: stroke },
           style: isNone
-            ? { stroke: '#e5e7eb', strokeDasharray: '6 6' }
-            : { stroke: '#e5e7eb' },
-          data: { direction: dir },
+            ? { stroke, strokeDasharray: '6 6', strokeWidth: 2 }
+            : { stroke, strokeWidth: 2 },
+          data: { direction: dir, linkType: e.type },
         }
       }),
     [edges]
@@ -228,8 +227,7 @@ export default function FlowPage() {
   return (
     <main className="max-w-6xl mx-auto p-4 text-white relative">
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-3xl font-bold">{flow?.name || 'Loading...'}</h1>
-
+        <h1 className="text-3xl font-bold">{flow?.name || 'Loading…'}</h1>
         <div className="flex items-center gap-2">
           <button
             onClick={autoSort}
@@ -238,7 +236,6 @@ export default function FlowPage() {
           >
             {layingOut ? 'Auto-sorting…' : 'Auto-sort'}
           </button>
-
           <button
             onClick={() => setShowAddNode(true)}
             className="bg-green-600 text-white px-3 py-2 rounded-md hover:bg-green-700 transition"
@@ -273,10 +270,7 @@ export default function FlowPage() {
               <AddNodeForm
                 flowId={flow.id}
                 userId={flow.user_id}
-                onNodeAdded={() => {
-                  refreshCanvas()
-                  setShowAddNode(false)
-                }}
+                onNodeAdded={() => { refreshCanvas(); setShowAddNode(false) }}
               />
             )}
             <div className="mt-4 text-right">
