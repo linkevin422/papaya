@@ -10,16 +10,6 @@ import AddNodeForm from './AddNodeForm'
 import { MarkerType } from 'reactflow'
 import { Dialog } from '@headlessui/react'
 import { Button } from '@/components/ui/button'
-import {
-  Landmark,
-  Store as StoreIcon,
-  Package,
-  Megaphone,
-  Briefcase,
-  TrendingUp,
-  HandCoins,
-  Circle
-} from 'lucide-react'
 
 const supabase = createClient()
 
@@ -30,12 +20,11 @@ type EdgeData = {
   flow_id: string
   source_id: string
   target_id: string
-  type: string            // Income | Traffic | Fuel
-  direction: string | null // a->b | b->a | both | none
+  type: string
+  direction: string | null
   label?: string | null
 }
 
-/** Colors */
 const NODE_COLOR: Record<string, string> = {
   Bank: '#10b981',
   Store: '#f59e0b',
@@ -50,19 +39,6 @@ const EDGE_COLOR: Record<string, string> = {
   Traffic: '#60a5fa',
   Fuel: '#f97316',
 }
-
-/** Icons */
-const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  Bank: Landmark,
-  Store: StoreIcon,
-  Product: Package,
-  Platform: Megaphone,
-  Job: Briefcase,
-  Investment: TrendingUp,
-  Sponsor: HandCoins,
-}
-
-/** Helpers */
 const normalizeType = (t?: string) => (t || '').trim()
 const normalizeDir = (d?: string | null): 'a->b' | 'b->a' | 'both' | 'none' => {
   if (!d) return 'a->b'
@@ -74,18 +50,6 @@ const normalizeDir = (d?: string | null): 'a->b' | 'b->a' | 'both' | 'none' => {
   return 'a->b'
 }
 
-/** Small label component with lucide icon */
-function NodeLabel({ name, type }: { name: string; type?: string }) {
-  const t = normalizeType(type)
-  const Icon = ICONS[t] || Circle
-  return (
-    <div className="flex items-center gap-2">
-      <Icon className="w-4 h-4" />
-      <span className="font-semibold">{name}</span>
-    </div>
-  )
-}
-
 export default function FlowPage() {
   const flowId = useParams().id as string
   const [flow, setFlow] = useState<Flow | null>(null)
@@ -95,6 +59,11 @@ export default function FlowPage() {
   const [selectedEdge, setSelectedEdge] = useState<EdgeData | null>(null)
   const [showAddNode, setShowAddNode] = useState(false)
   const [layingOut, setLayingOut] = useState(false)
+
+  // heartbeat totals for this flow
+  const [daily, setDaily] = useState<number>(0)
+  const [monthly, setMonthly] = useState<number>(0)
+  const [yearly, setYearly] = useState<number>(0)
 
   const fetchFlow = async () => {
     const { data } = await supabase.from('flows').select('*').eq('id', flowId).single()
@@ -108,17 +77,32 @@ export default function FlowPage() {
     const { data } = await supabase.from('edges').select('*').eq('flow_id', flowId)
     if (data) setEdges(data as any)
   }
-  const refreshCanvas = async () => { await Promise.all([fetchNodes(), fetchEdges()]) }
+  const fetchHeadline = async () => {
+    const { data } = await supabase
+      .from('v_flow_headline')
+      .select('daily_total,monthly_total,yearly_total')
+      .eq('flow_id', flowId)
+      .maybeSingle()
+    setDaily(Number(data?.daily_total || 0))
+    setMonthly(Number(data?.monthly_total || 0))
+    setYearly(Number(data?.yearly_total || 0))
+  }
+
+  const refreshCanvas = async () => {
+    await Promise.all([fetchNodes(), fetchEdges(), fetchHeadline()])
+  }
 
   useEffect(() => {
-    if (flowId) { fetchFlow(); refreshCanvas() }
+    if (flowId) {
+      fetchFlow()
+      refreshCanvas()
+    }
   }, [flowId])
 
-  /** Auto-sort: simple layered layout by direction */
+  // ----- Auto-sort (same as before) -----
   const autoSort = async () => {
     if (!nodes.length) return
     setLayingOut(true)
-
     type Pair = { u: string; v: string }
     const directed: Pair[] = []
     const idSet = new Set(nodes.map(n => n.id))
@@ -128,7 +112,6 @@ export default function FlowPage() {
       if (dir === 'a->b') directed.push({ u: e.source_id, v: e.target_id })
       else if (dir === 'b->a') directed.push({ u: e.target_id, v: e.source_id })
     }
-
     const rank = new Map<string, number>(nodes.map(n => [n.id, 0]))
     const N = nodes.length
     for (let i = 0; i < N; i++) {
@@ -139,7 +122,6 @@ export default function FlowPage() {
       }
       if (!changed) break
     }
-
     const H = 260, V = 160
     const layers = new Map<number, string[]>()
     for (const n of nodes) {
@@ -156,7 +138,6 @@ export default function FlowPage() {
       })
       layers.set(r, arr)
     }
-
     const updates: { id: string; x: number; y: number }[] = []
     const ranks = Array.from(layers.keys())
     const minRank = Math.min(...ranks), maxRank = Math.max(...ranks)
@@ -166,21 +147,19 @@ export default function FlowPage() {
       const yStart = -((k - 1) * V) / 2
       arr.forEach((id, i) => updates.push({ id, x: r * H, y: yStart + i * V }))
     }
-
     await Promise.all(updates.map(u => supabase.from('nodes').update({ x: u.x, y: u.y }).eq('id', u.id)))
     await refreshCanvas()
     setLayingOut(false)
   }
 
-  /** ReactFlow nodes/edges */
+  // ReactFlow nodes/edges
   const rfNodes = useMemo(
     () =>
       nodes.map((n) => {
-        const t = normalizeType(n.type)
-        const bg = NODE_COLOR[t] || '#64748b'
+        const bg = NODE_COLOR[normalizeType(n.type)] || '#64748b'
         return {
           id: n.id,
-          data: { label: <NodeLabel name={n.name} type={n.type} /> },
+          data: { label: n.name },
           type: 'default',
           position: {
             x: typeof n.x === 'number' ? n.x : Math.random() * 300,
@@ -227,7 +206,15 @@ export default function FlowPage() {
   return (
     <main className="max-w-6xl mx-auto p-4 text-white relative">
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-3xl font-bold">{flow?.name || 'Loading…'}</h1>
+        <div>
+          <h1 className="text-3xl font-bold">{flow?.name || 'Loading…'}</h1>
+          <div className="text-sm text-white/70 mt-1">
+            Heartbeat:&nbsp;
+            <span className="font-semibold">${daily.toFixed(2)}</span>/day ·&nbsp;
+            <span className="font-semibold">${monthly.toFixed(2)}</span>/mo ·&nbsp;
+            <span className="font-semibold">${yearly.toFixed(2)}</span>/yr
+          </div>
+        </div>
         <div className="flex items-center gap-2">
           <button
             onClick={autoSort}
@@ -300,7 +287,7 @@ export default function FlowPage() {
           edge={selectedEdge}
           nodes={nodes}
           onClose={() => setSelectedEdge(null)}
-          refresh={refreshCanvas}
+          refresh={async () => { await refreshCanvas() }}   // refresh also updates heartbeat
         />
       )}
     </main>
