@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Dialog } from '@headlessui/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,7 +9,7 @@ import { createClient } from '@/lib/supabase'
 type Props = {
   open: boolean
   onClose: () => void
-  node: { id: string; name: string; type?: string }
+  node: { id: string; name: string; type?: string | null }
   refresh: () => void
 }
 
@@ -21,70 +21,187 @@ const NODE_TYPES = [
   'Job',
   'Investment',
   'Sponsor',
-  'Other'
+  'Other',
 ]
 
+const supabase = createClient()
+
 export default function NodeModal({ open, onClose, node, refresh }: Props) {
-  const supabase = createClient()
   const [name, setName] = useState(node.name)
-  const [type, setType] = useState(node.type || 'Platform')
+  const [type, setType] = useState<string>(node.type || 'Platform')
+  const [saving, setSaving] = useState(false)
+
+  // delete confirm
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  const [connectedCount, setConnectedCount] = useState<number | null>(null)
 
   useEffect(() => {
     setName(node.name)
     setType(node.type || 'Platform')
   }, [node])
 
+  useEffect(() => {
+    if (!open || !node.id) return
+    // fetch number of connected edges for delete warning
+    const loadConnections = async () => {
+      const { count } = await supabase
+        .from('edges')
+        .select('id', { count: 'exact', head: true })
+        .or(`source_id.eq.${node.id},target_id.eq.${node.id}`)
+      setConnectedCount(count ?? 0)
+    }
+    loadConnections()
+  }, [open, node.id])
+
+  // state
+  const dirty = useMemo(
+    () => name.trim() !== (node.name || '').trim() || (type || '') !== (node.type || 'Platform'),
+    [name, type, node.name, node.type]
+  )
+  const valid = name.trim().length > 0
+
+  // actions
   const handleSave = async () => {
-    await supabase.from('nodes').update({ name, type }).eq('id', node.id)
+    if (!valid || saving) return
+    setSaving(true)
+    await supabase.from('nodes').update({ name: name.trim(), type }).eq('id', node.id)
+    setSaving(false)
     await refresh()
     onClose()
   }
 
-  const handleDelete = async () => {
+  const tryDelete = () => setConfirmDeleteOpen(true)
+
+  const handleDeleteConfirmed = async () => {
     await supabase.from('nodes').delete().eq('id', node.id)
+    setConfirmDeleteOpen(false)
     await refresh()
     onClose()
   }
+
+  // keyboard shortcuts
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'enter') handleSave()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, onClose, name, type])
 
   return (
     <Dialog open={open} onClose={onClose} className="fixed inset-0 z-50">
       <div className="fixed inset-0 bg-black/70" />
-      <div className="fixed inset-0 flex items-center justify-center">
-        <Dialog.Panel className="bg-zinc-900 text-white p-6 rounded-xl w-full max-w-md border border-white/10 space-y-4">
-          <Dialog.Title className="text-lg font-semibold">Edit Node</Dialog.Title>
-
-          <div className="space-y-2">
-            <label className="block text-sm">Name</label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} />
-
-            <label className="block text-sm mt-4">Type</label>
-            <select
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-              className="bg-zinc-800 text-white rounded px-3 py-2 w-full"
-            >
-              {NODE_TYPES.map(t => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
+      <div className="fixed inset-0 flex items-center justify-center p-4">
+        <Dialog.Panel className="w-full max-w-md rounded-2xl border border-white/10 bg-zinc-950 text-white shadow-2xl">
+          {/* Header */}
+          <div className="flex items-center justify-between p-6 border-b border-white/10">
+            <Dialog.Title className="truncate text-xl font-semibold tracking-tight">
+              Edit Node
+            </Dialog.Title>
           </div>
 
-          <div className="flex justify-between pt-4">
-            <Button onClick={handleDelete} className="bg-red-600 hover:bg-red-700 text-white">
-              Delete
-            </Button>
-            <div className="flex gap-2">
-              <button
-                onClick={onClose}
-                className="bg-transparent text-white hover:text-gray-400 px-4 py-2 rounded"
-              >
-                Cancel
-              </button>
-              <Button onClick={handleSave}>Save</Button>
+          {/* Body */}
+          <div className="p-6 space-y-4">
+            <div>
+              <label className="mb-2 block text-xs uppercase tracking-wider text-white/60">
+                Name
+              </label>
+              <Input
+                autoFocus
+                placeholder="Node name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="h-10"
+              />
             </div>
+
+            <div>
+              <label className="mb-2 block text-xs uppercase tracking-wider text-white/60">
+                Type
+              </label>
+              <select
+                value={type}
+                onChange={(e) => setType(e.target.value)}
+                className="h-10 w-full rounded-lg bg-zinc-900 px-3 text-sm text-white outline-none border border-white/10 focus:ring-2 focus:ring-white/20"
+              >
+                {NODE_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="p-6 border-t border-white/10">
+            <div className="flex items-center justify-between">
+              <button
+                onClick={tryDelete}
+                className="h-10 inline-flex items-center justify-center rounded-md border border-red-500/50 px-4 text-red-300 hover:text-red-200 hover:border-red-400 transition"
+              >
+                Delete Node
+              </button>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={onClose}
+                  className="h-10 rounded-md border border-white/10 px-4 text-white hover:text-gray-300"
+                >
+                  Cancel
+                </button>
+                <Button
+                  onClick={handleSave}
+                  disabled={!valid || !dirty || saving}
+                  className="h-10 min-w-[96px]"
+                >
+                  {saving ? 'Saving...' : 'Save'}
+                </Button>
+              </div>
+            </div>
+
+            {typeof connectedCount === 'number' && connectedCount > 0 && (
+              <div className="mt-2 text-xs text-red-300">
+                {connectedCount} link{connectedCount === 1 ? '' : 's'} connected to this node will be affected.
+              </div>
+            )}
           </div>
         </Dialog.Panel>
       </div>
+
+      {/* confirm delete */}
+      <Dialog
+        open={confirmDeleteOpen}
+        onClose={() => setConfirmDeleteOpen(false)}
+        className="fixed inset-0 z-[60]"
+      >
+        <div className="fixed inset-0 bg-black/80" />
+        <div className="fixed inset-0 flex items-center justify-center p-4">
+          <Dialog.Panel className="w-full max-w-md space-y-4 rounded-xl border border-white/10 bg-zinc-950 p-6 text-white">
+            <Dialog.Title className="text-lg font-semibold">Delete Node?</Dialog.Title>
+            <p className="text-sm text-white/80">
+              You are about to delete <b>{name || 'this node'}</b>.
+              {typeof connectedCount === 'number' && connectedCount > 0 ? (
+                <> This will also affect <b>{connectedCount}</b> connected link{connectedCount === 1 ? '' : 's'}.</>
+              ) : null}{' '}
+              This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setConfirmDeleteOpen(false)}
+                className="h-10 rounded-md border border-white/10 px-4 text-white hover:text-gray-300"
+              >
+                Cancel
+              </button>
+              <Button onClick={handleDeleteConfirmed} className="h-10 bg-red-600 hover:bg-red-700">
+                Delete Anyway
+              </Button>
+            </div>
+          </Dialog.Panel>
+        </div>
+      </Dialog>
     </Dialog>
   )
 }
