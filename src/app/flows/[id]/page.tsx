@@ -14,14 +14,14 @@ import { Button } from '@/components/ui/button'
 const supabase = createClient()
 
 type Flow = { id: string; name: string; user_id: string; created_at: string }
-type NodeData = { id: string; name: string; type?: string; x?: number; y?: number }
+type NodeData = { id: string; name: string; type?: string; x?: number | null; y?: number | null }
 type EdgeData = {
   id: string
   flow_id: string
   source_id: string
   target_id: string
   type: string
-  direction: string | null
+  direction: string | null // 'a->b' | 'b->a' | 'both' | 'none'
   label?: string | null
 }
 
@@ -33,12 +33,14 @@ const NODE_COLOR: Record<string, string> = {
   Job: '#06b6d4',
   Investment: '#22c55e',
   Sponsor: '#ec4899',
+  Other: '#64748b',
 }
 const EDGE_COLOR: Record<string, string> = {
   Income: '#22c55e',
   Traffic: '#60a5fa',
   Fuel: '#f97316',
 }
+
 const normalizeType = (t?: string) => (t || '').trim()
 const normalizeDir = (d?: string | null): 'a->b' | 'b->a' | 'both' | 'none' => {
   if (!d) return 'a->b'
@@ -60,7 +62,7 @@ export default function FlowPage() {
   const [showAddNode, setShowAddNode] = useState(false)
   const [layingOut, setLayingOut] = useState(false)
 
-  // heartbeat totals for this flow
+  // heartbeat totals
   const [daily, setDaily] = useState<number>(0)
   const [monthly, setMonthly] = useState<number>(0)
   const [yearly, setYearly] = useState<number>(0)
@@ -99,60 +101,145 @@ export default function FlowPage() {
     }
   }, [flowId])
 
-  // ----- Auto-sort (same as before) -----
-  const autoSort = async () => {
+  // ------------------------------------------------------------------
+  // ORGANIC 2D LAYOUT (force-directed with directional/rightward bias)
+  // ------------------------------------------------------------------
+  async function organicLayoutAndPersist() {
     if (!nodes.length) return
     setLayingOut(true)
-    type Pair = { u: string; v: string }
-    const directed: Pair[] = []
-    const idSet = new Set(nodes.map(n => n.id))
-    for (const e of edges) {
+
+    // simulation params (tweak if you want)
+    const ITER = Math.min(700, 200 + nodes.length * 15)
+    const L0 = 180                 // preferred edge length
+    const SPRING = 0.02            // edge spring strength
+    const REPULSE = 2200           // node-node repulsion factor
+    const GRAVITY = 0.02           // pull-to-center
+    const FRICTION = 0.85          // velocity damping
+    const BIAS_X = 0.008           // rightward bias for directed links
+    const BIAS_BOTH = 0.003        // small bias for bidirectional
+    const WIDTH = 1600, HEIGHT = 1000
+    const MARGIN = 80
+
+    // map ids
+    const idIndex = new Map<string, number>()
+    nodes.forEach((n, i) => idIndex.set(n.id, i))
+
+    // positions & velocities
+    const pos = nodes.map(n => ({
+      x: (typeof n.x === 'number' ? Number(n.x) : (Math.random() - 0.5) * 800),
+      y: (typeof n.y === 'number' ? Number(n.y) : (Math.random() - 0.5) * 600),
+    }))
+    const vel = nodes.map(() => ({ x: 0, y: 0 }))
+    const center = { x: 0, y: 0 }
+
+    // build edge list with weights/bias
+    const E = edges.map(e => {
+      const a = idIndex.get(e.source_id)
+      const b = idIndex.get(e.target_id)
+      if (a == null || b == null) return null
       const dir = normalizeDir(e.direction || undefined)
-      if (!idSet.has(e.source_id) || !idSet.has(e.target_id)) continue
-      if (dir === 'a->b') directed.push({ u: e.source_id, v: e.target_id })
-      else if (dir === 'b->a') directed.push({ u: e.target_id, v: e.source_id })
-    }
-    const rank = new Map<string, number>(nodes.map(n => [n.id, 0]))
-    const N = nodes.length
-    for (let i = 0; i < N; i++) {
-      let changed = false
-      for (const { u, v } of directed) {
-        const ru = rank.get(u)!; const rv = rank.get(v)!
-        if (rv < ru + 1) { rank.set(v, ru + 1); changed = true }
+      // stronger springs for money edges
+      const w =
+        normalizeType(e.type) === 'Traffic' ? SPRING * 0.5 : SPRING * 1.0
+      return { a, b, dir, w }
+    }).filter(Boolean) as { a: number; b: number; dir: 'a->b'|'b->a'|'both'|'none'; w: number }[]
+
+    // main loop
+    for (let t = 0; t < ITER; t++) {
+      // forces init
+      const fx = new Array(nodes.length).fill(0)
+      const fy = new Array(nodes.length).fill(0)
+
+      // repulsion (Coulomb)
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const dx = pos[i].x - pos[j].x
+          const dy = pos[i].y - pos[j].y
+          const d2 = dx*dx + dy*dy + 0.01
+          const f = REPULSE / d2
+          const inv = 1 / Math.sqrt(d2)
+          const ux = dx * inv, uy = dy * inv
+          fx[i] += f * ux; fy[i] += f * uy
+          fx[j] -= f * ux; fy[j] -= f * uy
+        }
       }
-      if (!changed) break
+
+      // attraction (springs) + directional bias
+      for (const { a, b, dir, w } of E) {
+        const dx = pos[b].x - pos[a].x
+        const dy = pos[b].y - pos[a].y
+        const dist = Math.max(0.1, Math.hypot(dx, dy))
+        const ux = dx / dist
+        const uy = dy / dist
+
+        const springF = w * (dist - L0)
+        fx[a] += springF * ux
+        fy[a] += springF * uy
+        fx[b] -= springF * ux
+        fy[b] -= springF * uy
+
+        // encourage arrows to point right-ish (or left if user reversed)
+        if (dir === 'a->b') {
+          fx[b] += BIAS_X * (L0 - dx)  // push b to the right of a
+          fx[a] -= BIAS_X * (L0 - dx)
+        } else if (dir === 'b->a') {
+          fx[a] += BIAS_X * (L0 + dx)  // push a to the right of b
+          fx[b] -= BIAS_X * (L0 + dx)
+        } else if (dir === 'both') {
+          // gentle spread to avoid perfect stacking
+          fx[a] -= BIAS_BOTH * dx
+          fx[b] += BIAS_BOTH * dx
+          fy[a] -= BIAS_BOTH * dy
+          fy[b] += BIAS_BOTH * dy
+        }
+      }
+
+      // gravity to center
+      for (let i = 0; i < nodes.length; i++) {
+        fx[i] += -GRAVITY * (pos[i].x - center.x)
+        fy[i] += -GRAVITY * (pos[i].y - center.y)
+      }
+
+      // integrate
+      const step = 0.8 * (1 - t / ITER) + 0.2   // cool down
+      for (let i = 0; i < nodes.length; i++) {
+        vel[i].x = (vel[i].x + fx[i] * step) * FRICTION
+        vel[i].y = (vel[i].y + fy[i] * step) * FRICTION
+        pos[i].x += vel[i].x
+        pos[i].y += vel[i].y
+      }
     }
-    const H = 260, V = 160
-    const layers = new Map<number, string[]>()
-    for (const n of nodes) {
-      const r = rank.get(n.id) ?? 0
-      const arr = layers.get(r) ?? []
-      arr.push(n.id)
-      layers.set(r, arr)
+
+    // normalize to a nice viewport and add margins
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+    for (const p of pos) {
+      if (p.x < minX) minX = p.x
+      if (p.x > maxX) maxX = p.x
+      if (p.y < minY) minY = p.y
+      if (p.y > maxY) maxY = p.y
     }
-    for (const [r, arr] of layers) {
-      arr.sort((a, b) => {
-        const na = nodes.find(n => n.id === a)?.name || ''
-        const nb = nodes.find(n => n.id === b)?.name || ''
-        return na.localeCompare(nb)
-      })
-      layers.set(r, arr)
-    }
-    const updates: { id: string; x: number; y: number }[] = []
-    const ranks = Array.from(layers.keys())
-    const minRank = Math.min(...ranks), maxRank = Math.max(...ranks)
-    for (let r = minRank; r <= maxRank; r++) {
-      const arr = layers.get(r) || []
-      const k = arr.length
-      const yStart = -((k - 1) * V) / 2
-      arr.forEach((id, i) => updates.push({ id, x: r * H, y: yStart + i * V }))
-    }
-    await Promise.all(updates.map(u => supabase.from('nodes').update({ x: u.x, y: u.y }).eq('id', u.id)))
+    const spanX = Math.max(300, maxX - minX)
+    const spanY = Math.max(300, maxY - minY)
+    const sx = (WIDTH - 2*MARGIN) / spanX
+    const sy = (HEIGHT - 2*MARGIN) / spanY
+    const s = Math.min(sx, sy)
+
+    const updates = pos.map((p, i) => {
+      const x = (p.x - minX) * s + MARGIN
+      const y = (p.y - minY) * s + MARGIN
+      return { id: nodes[i].id, x: Math.round(x), y: Math.round(y) }
+    })
+
+    // persist
+    await Promise.all(updates.map(u =>
+      supabase.from('nodes').update({ x: u.x, y: u.y }).eq('id', u.id)
+    ))
+
     await refreshCanvas()
     setLayingOut(false)
   }
 
-  // ReactFlow nodes/edges
+  // ReactFlow data
   const rfNodes = useMemo(
     () =>
       nodes.map((n) => {
@@ -162,8 +249,8 @@ export default function FlowPage() {
           data: { label: n.name },
           type: 'default',
           position: {
-            x: typeof n.x === 'number' ? n.x : Math.random() * 300,
-            y: typeof n.y === 'number' ? n.y : Math.random() * 300,
+            x: typeof n.x === 'number' ? Number(n.x) : Math.random() * 300,
+            y: typeof n.y === 'number' ? Number(n.y) : Math.random() * 300,
           },
           style: {
             backgroundColor: bg,
@@ -205,7 +292,7 @@ export default function FlowPage() {
 
   return (
     <main className="max-w-6xl mx-auto p-4 text-white relative">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div>
           <h1 className="text-3xl font-bold">{flow?.name || 'Loading…'}</h1>
           <div className="text-sm text-white/70 mt-1">
@@ -217,11 +304,11 @@ export default function FlowPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={autoSort}
+            onClick={organicLayoutAndPersist}
             disabled={layingOut}
             className="bg-indigo-600 disabled:bg-indigo-600/50 text-white px-3 py-2 rounded-md hover:bg-indigo-700 transition"
           >
-            {layingOut ? 'Auto-sorting…' : 'Auto-sort'}
+            {layingOut ? 'Auto-layout…' : 'Auto-layout (Organic)'}
           </button>
           <button
             onClick={() => setShowAddNode(true)}
@@ -287,7 +374,7 @@ export default function FlowPage() {
           edge={selectedEdge}
           nodes={nodes}
           onClose={() => setSelectedEdge(null)}
-          refresh={async () => { await refreshCanvas() }}   // refresh also updates heartbeat
+          refresh={async () => { await refreshCanvas() }}
         />
       )}
     </main>

@@ -20,6 +20,7 @@ const NODE_TYPES = [
   'Job',
   'Investment',
   'Sponsor',
+  'Other'
 ]
 
 export default function AddNodeForm({ flowId, userId, onNodeAdded }: Props) {

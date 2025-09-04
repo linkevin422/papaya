@@ -21,6 +21,7 @@ const NODE_TYPES = [
   'Job',
   'Investment',
   'Sponsor',
+  'Other'
 ]
 
 export default function NodeModal({ open, onClose, node, refresh }: Props) {

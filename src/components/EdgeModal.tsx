@@ -13,18 +13,18 @@ type Props = {
     id: string
     source_id: string
     target_id: string
-    type: string | null         // Income | Traffic | Fuel
-    direction: string | null    // a->b | b->a | both | none
+    type: string | null        // 'Income' | 'Traffic' | 'Fuel'
+    direction: string | null   // 'a->b' | 'b->a' | 'both' | 'none'
     label?: string | null
   }
   nodes: { id: string; name: string }[]
-  refresh: () => void           // parent will refresh canvas + headline
+  refresh: () => void          // refresh canvas + headline
 }
 
 type Entry = {
   id: string
   edge_id: string
-  entry_date: string   // ISO date (YYYY-MM-DD)
+  entry_date: string
   amount: number
   note: string | null
   created_at: string
@@ -41,19 +41,30 @@ type EdgeRecurring = {
 const supabase = createClient()
 
 export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props) {
-  // ------- edge props -------
+  // ------- edge meta -------
   const [type, setType] = useState<'Income' | 'Traffic' | 'Fuel'>((edge.type as any) || 'Traffic')
   const [dir, setDir]   = useState<'a->b' | 'b->a' | 'both' | 'none'>((edge.direction as any) || 'a->b')
   const [label, setLabel] = useState<string>(edge.label || '')
 
-  // ------- entries state -------
+  // ------- entries -------
   const [entries, setEntries] = useState<Entry[]>([])
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [selectAll, setSelectAll] = useState(false)
+
   const [recurring, setRecurring] = useState<EdgeRecurring | null>(null)
   const [newAmount, setNewAmount] = useState<string>('')
   const [newDate, setNewDate]     = useState<string>(() => new Date().toISOString().slice(0, 10))
   const [newNote, setNewNote]     = useState<string>('')
 
-  // fetch helpers
+  // delete-edge confirm
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  const hasEntries = entries.length > 0
+
+  const nameOf = (id: string) => nodes.find(n => n.id === id)?.name || 'Unknown'
+  const aName = useMemo(() => nameOf(edge.source_id), [edge.source_id, nodes])
+  const bName = useMemo(() => nameOf(edge.target_id), [edge.target_id, nodes])
+
+  // ------- load helpers -------
   const loadEntries = async () => {
     const { data } = await supabase
       .from('edge_entries')
@@ -61,6 +72,8 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
       .eq('edge_id', edge.id)
       .order('entry_date', { ascending: false })
     setEntries((data as any) || [])
+    setSelectedIds(new Set())
+    setSelectAll(false)
   }
   const loadRecurring = async () => {
     const { data } = await supabase
@@ -81,14 +94,11 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
     }
   }, [open, edge])
 
-  const nameOf = (id: string) => nodes.find(n => n.id === id)?.name || 'Unknown'
-  const aName = useMemo(() => nameOf(edge.source_id), [edge.source_id, nodes])
-  const bName = useMemo(() => nameOf(edge.target_id), [edge.target_id, nodes])
-
   // ------- actions -------
   const handleSaveMeta = async () => {
     const update: any = { type, direction: dir, label: label.trim() || null }
 
+    // If user flips direction, optionally swap endpoints to make the arrow literal
     if (dir === 'a->b') {
       update.source_id = edge.source_id
       update.target_id = edge.target_id
@@ -96,26 +106,33 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
       update.source_id = edge.target_id
       update.target_id = edge.source_id
     }
-    // both/none keep endpoints
+    // 'both' / 'none' keep endpoints
 
     await supabase.from('edges').update(update).eq('id', edge.id)
     await refresh()
     onClose()
   }
 
-  const handleDeleteEdge = async () => {
-    await supabase.from('edges').delete().eq('id', edge.id)
+  const tryDeleteEdge = () => {
+    if (hasEntries) setConfirmDeleteOpen(true)
+    else handleDeleteEdgeConfirmed()
+  }
+
+  const handleDeleteEdgeConfirmed = async () => {
+    await supabase.from('edges').delete().eq('id', edge.id) // CASCADE deletes entries
+    setConfirmDeleteOpen(false)
     await refresh()
     onClose()
   }
 
   const addEntry = async () => {
+    if (type === 'Traffic') return // hidden anyway; guard just in case
     const amt = parseFloat(newAmount)
     if (!newDate || isNaN(amt)) return
     await supabase.from('edge_entries').insert({
       edge_id: edge.id,
       entry_date: newDate,
-      amount: amt,
+      amount: amt,                // Fuel will count negative in the view; user types positive
       note: newNote.trim() || null,
     })
     setNewAmount('')
@@ -132,7 +149,33 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
     await refresh()
   }
 
-  const fmt = (n: number | null | undefined) =>
+  const toggleSelect = (id: string) => {
+    const next = new Set(selectedIds)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    setSelectedIds(next)
+    setSelectAll(next.size === entries.length && entries.length > 0)
+  }
+
+  const toggleSelectAll = () => {
+    if (selectAll) {
+      setSelectedIds(new Set())
+      setSelectAll(false)
+    } else {
+      setSelectedIds(new Set(entries.map(e => e.id)))
+      setSelectAll(true)
+    }
+  }
+
+  const deleteSelected = async () => {
+    if (selectedIds.size === 0) return
+    await supabase.from('edge_entries').delete().in('id', Array.from(selectedIds))
+    await loadEntries()
+    await loadRecurring()
+    await refresh()
+  }
+
+  const fmtMoney = (n: number | null | undefined) =>
     typeof n === 'number' ? `$${n.toFixed(2)}` : '—'
 
   return (
@@ -182,73 +225,121 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
             </div>
           </div>
 
-          {/* Money entries */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold">Money Entries</h3>
-              <div className="text-sm text-white/70">
-                {recurring?.entries_count && recurring.entries_count >= 2
-                  ? <>Recurring: <span className="font-semibold">{fmt(recurring?.daily_flow)}</span>/day · <span className="font-semibold">{fmt(recurring?.monthly_flow)}</span>/mo · <span className="font-semibold">{fmt(recurring?.yearly_flow)}</span>/yr</>
-                  : <>Add at least <b>2</b> entries to compute recurring.</>}
+          {/* Money entries — hidden for Traffic */}
+          {type !== 'Traffic' && (
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="font-semibold">Money Entries</h3>
+                <div className="text-sm text-white/70">
+                  {recurring?.entries_count && recurring.entries_count >= 2
+                    ? <>Recurring:&nbsp;
+                        <span className="font-semibold">{fmtMoney(recurring?.daily_flow)}</span>/day ·&nbsp;
+                        <span className="font-semibold">{fmtMoney(recurring?.monthly_flow)}</span>/mo ·&nbsp;
+                        <span className="font-semibold">{fmtMoney(recurring?.yearly_flow)}</span>/yr
+                      </>
+                    : <>Add at least <b>2</b> entries to compute recurring.</>}
+                </div>
+              </div>
+
+              {/* add row */}
+              <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr_1fr_auto] gap-2">
+                <Input
+                  type="date"
+                  value={newDate}
+                  onChange={(e) => setNewDate(e.target.value)}
+                  className="bg-black border-zinc-700"
+                />
+                <Input
+                  type="number"
+                  placeholder="Amount"
+                  value={newAmount}
+                  onChange={(e) => setNewAmount(e.target.value)}
+                  className="bg-black border-zinc-700"
+                />
+                <Input
+                  placeholder="Note (optional)"
+                  value={newNote}
+                  onChange={(e) => setNewNote(e.target.value)}
+                  className="bg-black border-zinc-700"
+                />
+                <Button onClick={addEntry}>Add</Button>
+              </div>
+
+              {/* list + bulk tools */}
+              <div className="border border-white/10 rounded-lg">
+                <div className="flex items-center justify-between p-2 text-sm text-white/70">
+                  <label className="inline-flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={selectAll}
+                      onChange={toggleSelectAll}
+                      className="accent-white"
+                    />
+                    Select All
+                  </label>
+                  <button
+                    onClick={deleteSelected}
+                    className={`px-2 py-1 rounded ${
+                      selectedIds.size ? 'text-red-300 hover:text-red-200' : 'text-white/30 cursor-not-allowed'
+                    }`}
+                    disabled={selectedIds.size === 0}
+                  >
+                    Delete Selected
+                  </button>
+                </div>
+
+                <div className="divide-y divide-white/5">
+                  {entries.length === 0 && (
+                    <div className="p-3 text-sm text-white/60">No entries yet.</div>
+                  )}
+                  {entries.map((en) => (
+                    <div key={en.id} className="p-3 flex items-center justify-between">
+                      <label className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(en.id)}
+                          onChange={() => toggleSelect(en.id)}
+                          className="accent-white"
+                        />
+                        <div className="text-sm">
+                          <div className="font-medium">{en.entry_date}</div>
+                          <div className="text-white/70">
+                            {en.note || <span className="italic">—</span>}
+                          </div>
+                        </div>
+                      </label>
+                      <div className="flex items-center gap-3">
+                        <div className="font-semibold">${Number(en.amount).toFixed(2)}</div>
+                        <button
+                          onClick={() => deleteEntry(en.id)}
+                          className="text-red-400 hover:text-red-300 text-sm"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
+          )}
 
-            {/* add row */}
-            <div className="grid grid-cols-1 sm:grid-cols-[140px_1fr_1fr_auto] gap-2">
-              <Input
-                type="date"
-                value={newDate}
-                onChange={(e) => setNewDate(e.target.value)}
-                className="bg-black border-zinc-700"
-              />
-              <Input
-                type="number"
-                placeholder="Amount"
-                value={newAmount}
-                onChange={(e) => setNewAmount(e.target.value)}
-                className="bg-black border-zinc-700"
-              />
-              <Input
-                placeholder="Note (optional)"
-                value={newNote}
-                onChange={(e) => setNewNote(e.target.value)}
-                className="bg-black border-zinc-700"
-              />
-              <Button onClick={addEntry}>Add</Button>
-            </div>
-
-            {/* list */}
-            <div className="border border-white/10 rounded-lg divide-y divide-white/5">
-              {entries.length === 0 && (
-                <div className="p-3 text-sm text-white/60">No entries yet.</div>
-              )}
-              {entries.map((en) => (
-                <div key={en.id} className="p-3 flex items-center justify-between">
-                  <div className="text-sm">
-                    <div className="font-medium">{en.entry_date}</div>
-                    <div className="text-white/70">
-                      {en.note || <span className="italic">—</span>}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="font-semibold">${Number(en.amount).toFixed(2)}</div>
-                    <button
-                      onClick={() => deleteEntry(en.id)}
-                      className="text-red-400 hover:text-red-300 text-sm"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* footer actions */}
+          {/* footer */}
           <div className="flex justify-between pt-2">
-            <Button onClick={handleDeleteEdge} className="bg-red-600 hover:bg-red-700 text-white">
-              Delete Edge
-            </Button>
+            <div className="space-y-2">
+              <Button
+                onClick={tryDeleteEdge}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                Delete Edge
+              </Button>
+              {hasEntries && (
+                <div className="text-xs text-red-300">
+                  This edge has money entries. Deleting it will also delete all related entries permanently.
+                </div>
+              )}
+            </div>
+
             <div className="flex gap-2">
               <button
                 onClick={onClose}
@@ -261,6 +352,31 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
           </div>
         </Dialog.Panel>
       </div>
+
+      {/* confirm delete mini-dialog */}
+      <Dialog open={confirmDeleteOpen} onClose={() => setConfirmDeleteOpen(false)} className="fixed inset-0 z-[60]">
+        <div className="fixed inset-0 bg-black/80" />
+        <div className="fixed inset-0 flex items-center justify-center p-4">
+          <Dialog.Panel className="bg-zinc-900 text-white p-6 rounded-xl w-full max-w-md border border-white/10 space-y-4">
+            <Dialog.Title className="text-lg font-semibold">Delete Edge?</Dialog.Title>
+            <p className="text-sm text-white/80">
+              This edge has <b>{entries.length}</b> money entr{entries.length === 1 ? 'y' : 'ies'}.
+              Deleting the edge will <b>permanently delete</b> those entries too.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setConfirmDeleteOpen(false)}
+                className="bg-transparent text-white hover:text-gray-400 px-4 py-2 rounded"
+              >
+                Cancel
+              </button>
+              <Button onClick={handleDeleteEdgeConfirmed} className="bg-red-600 hover:bg-red-700">
+                Delete Anyway
+              </Button>
+            </div>
+          </Dialog.Panel>
+        </div>
+      </Dialog>
     </Dialog>
   )
 }
