@@ -2,20 +2,20 @@
 
 import { useCallback, useEffect } from 'react'
 import ReactFlow, {
-    Background,
-    Controls,
-    MiniMap,
-    addEdge,
-    useNodesState,
-    useEdgesState,
-    MarkerType,
-    Connection,
-    OnConnect,
-    Node,
-    Edge,
-  } from 'reactflow'
-  import { BackgroundVariant } from '@reactflow/background'
-  import 'reactflow/dist/style.css'
+  Background,
+  Controls,
+  MiniMap,
+  addEdge,
+  useNodesState,
+  useEdgesState,
+  MarkerType,
+  Connection,
+  OnConnect,
+  Node,
+  Edge,
+} from 'reactflow'
+import { BackgroundVariant } from '@reactflow/background'
+import 'reactflow/dist/style.css'
 import { createClient } from '@/lib/supabase'
 
 const supabase = createClient()
@@ -78,6 +78,7 @@ export default function FlowCanvas({
         type,
         direction: 'a->b',
         label: null,
+        show_amount: true, // new default
       })
 
       refresh()
@@ -111,44 +112,43 @@ export default function FlowCanvas({
         fitViewOptions={{ padding: 0.3 }}
         defaultViewport={{ x: 0, y: 0, zoom: 1 }}
       >
-        {/* Minimap: top-right, small, translucent, no overlap with watermark */}
         <MiniMap
-  position="top-right"
-  zoomable
-  pannable
-  className="!bg-transparent !border !border-white/10 !backdrop-blur-sm rounded-lg shadow-lg"
-  style={{ width: 160, height: 110 }}
-  maskColor="rgba(10,10,10,0.55)"
-  nodeStrokeColor={(n) => (n?.data as any)?.stroke || '#52525b'}
-  nodeColor={(n) => (n?.data as any)?.fill || '#3f3f46'}
-  nodeBorderRadius={8}
-/>
+          position="top-right"
+          zoomable
+          pannable
+          className="!bg-transparent !border !border-white/10 !backdrop-blur-sm rounded-lg shadow-lg"
+          style={{ width: 160, height: 110 }}
+          maskColor="rgba(10,10,10,0.55)"
+          nodeStrokeColor={(n) => (n?.data as any)?.stroke || '#52525b'}
+          nodeColor={(n) => (n?.data as any)?.fill || '#3f3f46'}
+          nodeBorderRadius={8}
+        />
 
-<Controls
-  position="bottom-left"
-  showInteractive={false}
-  style={{ bottom: 32, left: 32 }}   // <-- force offset
-  className="
-    !bg-zinc-800/80
-    !border !border-white/10
-    !rounded-xl
-    !shadow-lg
-    !p-1
-    [&_button]:!bg-transparent
-    [&_button]:!text-white
-    [&_button]:!border-0
-    [&_button:hover]:!bg-white/10
-  "
-/>
+        <Controls
+          position="bottom-left"
+          showInteractive={false}
+          style={{ bottom: 32, left: 32 }}
+          className="
+            !bg-zinc-800/80
+            !border !border-white/10
+            !rounded-xl
+            !shadow-lg
+            !p-1
+            [&_button]:!bg-transparent
+            [&_button]:!text-white
+            [&_button]:!border-0
+            [&_button:hover]:!bg-white/10
+          "
+        />
 
-<Background
-  id="grid"
-  variant={BackgroundVariant.Dots}
-  gap={24}
-  size={1}
-  color="rgba(255,255,255,0.08)"
-  className="pointer-events-none"
-/>
+        <Background
+          id="grid"
+          variant={BackgroundVariant.Dots}
+          gap={24}
+          size={1}
+          color="rgba(255,255,255,0.08)"
+          className="pointer-events-none"
+        />
       </ReactFlow>
     </div>
   )

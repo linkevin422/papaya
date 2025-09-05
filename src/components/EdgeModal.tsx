@@ -23,6 +23,7 @@ type Props = {
     type: string | null        // 'Income' | 'Traffic' | 'Fuel'
     direction: string | null   // 'a->b' | 'b->a' | 'both' | 'none'
     label?: string | null
+    show_amount?: boolean | null
   }
   nodes: { id: string; name: string }[]
   refresh: () => void
@@ -64,6 +65,7 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
   const [type, setType] = useState<'Income' | 'Traffic' | 'Fuel'>((edge.type as any) || 'Traffic')
   const [dir, setDir]   = useState<'a->b' | 'b->a' | 'both' | 'none'>((edge.direction as any) || 'a->b')
   const [label, setLabel] = useState<string>(edge.label || '')
+  const [showAmount, setShowAmount] = useState<boolean>(edge.show_amount ?? true)
 
   // entries
   const [entries, setEntries] = useState<Entry[]>([])
@@ -121,6 +123,7 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
     setType(((edge.type as any) || 'Traffic') as any)
     setDir(((edge.direction as any) || 'a->b') as any)
     setLabel(edge.label || '')
+    setShowAmount(edge.show_amount ?? true)
     if (open && edge.id) {
       loadEntries()
       loadRecurring()
@@ -136,13 +139,14 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [open, onClose, type, dir, label])
+  }, [open, onClose, type, dir, label, showAmount])
 
   // actions
   const handleSaveMeta = async () => {
     setSavingMeta(true)
-    const update: any = { type, direction: dir, label: label.trim() || null }
+    const update: any = { type, direction: dir, label: label.trim() || null, show_amount: showAmount }
 
+    // handle direction swap for persisted source/target
     if (dir === 'a->b') {
       update.source_id = edge.source_id
       update.target_id = edge.target_id
@@ -150,6 +154,7 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
       update.source_id = edge.target_id
       update.target_id = edge.source_id
     }
+
     await supabase.from('edges').update(update).eq('id', edge.id)
     setSavingMeta(false)
     await refresh()
@@ -259,8 +264,8 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
 
           {/* Body */}
           <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
-            {/* Direction + Type + Label */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Direction + Type + Label + Show amount */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="min-w-0">
                 <label className="block text-xs uppercase tracking-wider text-white/60 mb-2">
                   Direction
@@ -303,6 +308,20 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
                   className="h-10"
                 />
               </div>
+
+              <div className="min-w-0">
+                <label className="block text-xs uppercase tracking-wider text-white/60 mb-2">
+                  Show amount on link
+                </label>
+                <select
+                  value={showAmount ? 'yes' : 'no'}
+                  onChange={(e) => setShowAmount(e.target.value === 'yes')}
+                  className="w-full h-10 rounded-lg bg-zinc-900 border border-white/10 px-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20"
+                >
+                  <option value="yes">Yes</option>
+                  <option value="no">No</option>
+                </select>
+              </div>
             </div>
 
             {/* Money entries */}
@@ -338,7 +357,6 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
                     className="h-10"
                   />
                   <Input
-                    // text to avoid spinner arrows, but still mobile decimal keypad
                     type="text"
                     inputMode="decimal"
                     pattern="^[0-9]*[.,]?[0-9]*$"
@@ -366,7 +384,7 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
                   </button>
                 </div>
 
-                {/* list + bulk tools with filter + sort on the right */}
+                {/* list + bulk tools */}
                 <div className="rounded-lg border border-white/10 overflow-hidden">
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 px-3 py-2 text-sm bg-white/5">
                     <div className="flex items-center gap-3">
@@ -405,7 +423,6 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
                         onClick={() => setSortAsc((s) => !s)}
                         className="inline-flex items-center gap-1 rounded-md border border-white/10 px-2.5 py-1.5 text-white/80 hover:text-white hover:bg-white/5"
                         title={sortAsc ? 'Oldest first' : 'Newest first'}
-                        aria-label="Toggle sort order"
                       >
                         <ArrowUpDown className="h-4 w-4" />
                         {sortAsc ? 'Oldest' : 'Newest'}

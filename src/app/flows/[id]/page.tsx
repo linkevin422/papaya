@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import FlowCanvas from './FlowCanvas'
 import NodeModal from '@/components/NodeModal'
@@ -39,6 +39,12 @@ type EdgeData = {
   type: string
   direction: string | null
   label?: string | null
+  show_amount?: boolean | null
+  // attached recurring summary from view
+  daily_flow?: number | null
+  monthly_flow?: number | null
+  yearly_flow?: number | null
+  entries_count?: number | null
 }
 
 const NODE_COLOR: Record<string, string> = {
@@ -72,8 +78,11 @@ const normalizeDir = (d?: string | null): 'a->b' | 'b->a' | 'both' | 'none' => {
 const fmtUSD = (n: number) =>
   `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
+type ViewMode = 'daily' | 'monthly' | 'yearly'
+
 export default function FlowPage() {
   const urlParam = useParams().id as string
+  const qs = useSearchParams()
 
   const [flow, setFlow] = useState<Flow | null>(null)
   const [notFound, setNotFound] = useState(false)
@@ -91,6 +100,14 @@ export default function FlowPage() {
   const [monthly, setMonthly] = useState<number>(0)
   const [yearly, setYearly] = useState<number>(0)
 
+  // global view controls
+  const [viewMode, setViewMode] = useState<ViewMode>('monthly')
+  const [showAmounts, setShowAmounts] = useState<boolean>(true) // owner local toggle
+  const [shareNoAmounts, setShareNoAmounts] = useState<boolean>(false)
+
+  // read "no_amounts" in share links
+  const noAmountsParam = qs?.get('no_amounts') === '1'
+
   // session user
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -102,14 +119,17 @@ export default function FlowPage() {
   const fetchFlow = async () => {
     setNotFound(false)
     // try by real id
-    let { data, error } = await supabase.from('flows').select('*').eq('id', urlParam).maybeSingle()
-    if (!data && !error) {
+    const { data, error } = await supabase.from('flows').select('*').eq('id', urlParam).maybeSingle()
+    let flowData = data
+
+    if (!flowData && !error) {
       // try by share_id
       const res = await supabase.from('flows').select('*').eq('share_id', urlParam).maybeSingle()
-      data = res.data || null
+      flowData = res.data || null
     }
-    if (data) {
-      setFlow(data as Flow)
+
+    if (flowData) {
+      setFlow(flowData as Flow)
     } else {
       setFlow(null)
       setNotFound(true)
@@ -122,8 +142,41 @@ export default function FlowPage() {
   }
 
   const fetchEdges = async (fid: string) => {
-    const { data } = await supabase.from('edges').select('*').eq('flow_id', fid)
-    if (data) setEdges(data as any)
+    // 1) base edges, include show_amount
+    const { data: base } = await supabase
+      .from('edges')
+      .select('id,flow_id,source_id,target_id,type,direction,label,show_amount')
+      .eq('flow_id', fid)
+
+    const baseEdges = (base as EdgeData[]) || []
+
+    if (baseEdges.length === 0) {
+      setEdges([])
+      return
+    }
+
+    // 2) attach recurring flows from view for all edges in one shot
+    const ids = baseEdges.map(e => e.id)
+    const { data: rec } = await supabase
+      .from('v_edge_recurring_flow')
+      .select('edge_id,daily_flow,monthly_flow,yearly_flow,entries_count')
+      .in('edge_id', ids)
+
+    const byId = new Map<string, any>()
+    ;(rec || []).forEach((r: any) => byId.set(r.edge_id, r))
+
+    const merged = baseEdges.map(e => {
+      const r = byId.get(e.id)
+      return {
+        ...e,
+        daily_flow: r?.daily_flow ?? null,
+        monthly_flow: r?.monthly_flow ?? null,
+        yearly_flow: r?.yearly_flow ?? null,
+        entries_count: r?.entries_count ?? null,
+      }
+    })
+
+    setEdges(merged)
   }
 
   const fetchHeadline = async (fid: string) => {
@@ -165,6 +218,11 @@ export default function FlowPage() {
   const publicMode = flow?.public_mode ?? 1
   const canOpenDetails = isOwner || (isPublicViewer && publicMode >= 3)
 
+  // global rules for showing amounts on edges
+  const showAmountsForViewer =
+    (!isPublicViewer && showAmounts) ||
+    (isPublicViewer && publicMode >= 2 && !noAmountsParam)
+
   // rename flow
   const [editingName, setEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState('')
@@ -198,7 +256,7 @@ export default function FlowPage() {
   // share url constructed from share_id
   const shareUrl =
     typeof window !== 'undefined' && flow
-      ? `${window.location.origin}/flows/${flow.share_id}`
+      ? `${window.location.origin}/flows/${flow.share_id}${shareNoAmounts ? '?no_amounts=1' : ''}`
       : ''
 
   // auto layout and persist node positions
@@ -214,8 +272,6 @@ export default function FlowPage() {
     const FRICTION = 0.85
     const BIAS_X = 0.008
     const BIAS_BOTH = 0.003
-    const WIDTH = 1600, HEIGHT = 1000
-    const MARGIN = 80
 
     const idIndex = new Map<string, number>()
     nodes.forEach((n, i) => idIndex.set(n.id, i))
@@ -260,31 +316,31 @@ export default function FlowPage() {
         const ux = dx / dist
         const uy = dy / dist
 
-        const springF = w * (dist - L0)
+        const springF = w * (dist - 180)
         fx[a] += springF * ux; fy[a] += springF * uy
         fx[b] -= springF * ux; fy[b] -= springF * uy
 
         if (dir === 'a->b') {
-          fx[b] += BIAS_X * (L0 - dx)
-          fx[a] -= BIAS_X * (L0 - dx)
+          fx[b] += 0.008 * (180 - dx)
+          fx[a] -= 0.008 * (180 - dx)
         } else if (dir === 'b->a') {
-          fx[a] += BIAS_X * (L0 + dx)
-          fx[b] -= BIAS_X * (L0 + dx)
+          fx[a] += 0.008 * (180 + dx)
+          fx[b] -= 0.008 * (180 + dx)
         } else if (dir === 'both') {
-          fx[a] -= BIAS_BOTH * dx; fy[a] -= BIAS_BOTH * dy
-          fx[b] += BIAS_BOTH * dx; fy[b] += BIAS_BOTH * dy
+          fx[a] -= 0.003 * dx; fy[a] -= 0.003 * dy
+          fx[b] += 0.003 * dx; fy[b] += 0.003 * dy
         }
       }
 
       for (let i = 0; i < nodes.length; i++) {
-        fx[i] += -GRAVITY * (pos[i].x - center.x)
-        fy[i] += -GRAVITY * (pos[i].y - center.y)
+        fx[i] += -0.02 * (pos[i].x - center.x)
+        fy[i] += -0.02 * (pos[i].y - center.y)
       }
 
       const step = 0.8 * (1 - t / ITER) + 0.2
       for (let i = 0; i < nodes.length; i++) {
-        vel[i].x = (vel[i].x + fx[i] * step) * FRICTION
-        vel[i].y = (vel[i].y + fy[i] * step) * FRICTION
+        vel[i].x = (vel[i].x + fx[i] * step) * 0.85
+        vel[i].y = (vel[i].y + fy[i] * step) * 0.85
         pos[i].x += vel[i].x
         pos[i].y += vel[i].y
       }
@@ -351,11 +407,35 @@ export default function FlowPage() {
         const isBoth = dir === 'both'
         const isNone = dir === 'none'
         const stroke = EDGE_COLOR[normalizeType(e.type)] || '#e5e7eb'
+
+        // how the edge decides to show amount
+        let amountText: string | null = null
+        const isIncome = normalizeType(e.type) === 'Income'
+        const hasRecurring = (e.entries_count || 0) >= 2
+
+        if (showAmountsForViewer && isIncome && hasRecurring && e.show_amount !== false) {
+          const val =
+            viewMode === 'daily'
+              ? e.daily_flow
+              : viewMode === 'monthly'
+              ? e.monthly_flow
+              : e.yearly_flow
+          if (typeof val === 'number' && isFinite(val)) {
+            const suffix = viewMode === 'daily' ? '/d' : viewMode === 'monthly' ? '/mo' : '/yr'
+            amountText = `${fmtUSD(val)} ${suffix}`
+          }
+        }
+
+        const finalLabel =
+          amountText && e.label
+            ? `${e.label} • ${amountText}`
+            : amountText || e.label || undefined
+
         return {
           id: e.id,
           source: e.source_id,
           target: e.target_id,
-          label: e.label || undefined,
+          label: finalLabel,
           animated: !isBoth && !isNone,
           markerStart: isBoth ? { type: MarkerType.ArrowClosed, color: stroke } : undefined,
           markerEnd: isNone ? undefined : { type: MarkerType.ArrowClosed, color: stroke },
@@ -365,7 +445,7 @@ export default function FlowPage() {
           data: { direction: dir, linkType: e.type },
         }
       }),
-    [edges]
+    [edges, viewMode, showAmountsForViewer]
   )
 
   if (notFound) {
@@ -382,177 +462,204 @@ export default function FlowPage() {
     <main className="relative w-full text-white">
       {/* Header with stats and controls */}
       <div className="sticky top-0 z-30 bg-black/50 backdrop-blur supports-[backdrop-filter]:bg-black/30">
-  <div className="mx-auto max-w-6xl px-4 py-4">
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
-      {/* Left: title + totals */}
-      <div className="min-w-0">
-        {isOwner ? (
-          <div className="flex items-center gap-2">
-            {editingName ? (
-              <>
-                <input
-                  className="rounded-md border border-white/15 bg-black/40 px-2 py-1"
-                  value={nameDraft}
-                  onChange={(e) => setNameDraft(e.target.value)}
-                />
-                <button onClick={saveName} className="rounded-md border border-white/15 px-2 py-1">
-                  Save
-                </button>
-                <button
-                  onClick={() => { setEditingName(false); setNameDraft(flow?.name || '') }}
-                  className="rounded-md border border-white/15 px-2 py-1"
-                >
-                  Cancel
-                </button>
-              </>
-            ) : (
-              <>
+        <div className="mx-auto max-w-6xl px-4 py-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
+            {/* Left: title + totals */}
+            <div className="min-w-0">
+              {isOwner ? (
+                <div className="flex items-center gap-2">
+                  {editingName ? (
+                    <>
+                      <input
+                        className="rounded-md border border-white/15 bg-black/40 px-2 py-1"
+                        value={nameDraft}
+                        onChange={(e) => setNameDraft(e.target.value)}
+                      />
+                      <button onClick={saveName} className="rounded-md border border-white/15 px-2 py-1">
+                        Save
+                      </button>
+                      <button
+                        onClick={() => { setEditingName(false); setNameDraft(flow?.name || '') }}
+                        className="rounded-md border border-white/15 px-2 py-1"
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <h1 className="truncate text-2xl font-semibold">{flow?.name || '…'}</h1>
+                      <button
+                        onClick={() => setEditingName(true)}
+                        className="rounded-md border border-white/15 px-2 py-1 text-xs"
+                      >
+                        Rename
+                      </button>
+                    </>
+                  )}
+                </div>
+              ) : (
                 <h1 className="truncate text-2xl font-semibold">{flow?.name || '…'}</h1>
-                <button
-                  onClick={() => setEditingName(true)}
-                  className="rounded-md border border-white/15 px-2 py-1 text-xs"
-                >
-                  Rename
-                </button>
-              </>
-            )}
+              )}
+
+              {(!isPublicViewer || publicMode >= 2) && (
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs">
+                    {fmtUSD(daily)} <span className="text-white/60">/ day</span>
+                  </span>
+                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs">
+                    {fmtUSD(monthly)} <span className="text-white/60">/ mo</span>
+                  </span>
+                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs">
+                    {fmtUSD(yearly)} <span className="text-white/60">/ yr</span>
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Right: grouped controls */}
+            <div className="flex items-center gap-3 overflow-x-auto flex-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {isOwner && (
+                <>
+                  {/* Group 0: View mode + owner show amounts toggle */}
+                  <div className="flex flex-none items-center gap-1 rounded-md border border-white/15 bg-black/40 p-1">
+                    {(['daily','monthly','yearly'] as ViewMode[]).map(m => (
+                      <button
+                        key={m}
+                        onClick={() => setViewMode(m)}
+                        className={`h-8 px-3 rounded-md text-sm ${
+                          viewMode === m ? 'bg-white/15' : 'hover:bg-white/10'
+                        }`}
+                        title={`Show ${m} values on links`}
+                      >
+                        {m === 'daily' ? 'Daily' : m === 'monthly' ? 'Monthly' : 'Yearly'}
+                      </button>
+                    ))}
+                    <div className="h-6 w-px bg-white/10 mx-1" />
+                    <label className="flex items-center gap-1 text-sm px-2">
+                      <input
+                        type="checkbox"
+                        checked={showAmounts}
+                        onChange={(e) => setShowAmounts(e.target.checked)}
+                        className="accent-white"
+                      />
+                      Show amounts
+                    </label>
+                  </div>
+
+                  {/* Group 1: Visibility */}
+                  <div className="flex flex-none items-center gap-1 rounded-md border border-white/15 bg-black/40 p-1">
+                    <select
+                      value={flow?.privacy || 'private'}
+                      onChange={(e) => updatePrivacy(e.target.value as 'private' | 'public')}
+                      className="h-8 rounded-md bg-transparent px-2 text-sm outline-none"
+                      title="Privacy"
+                    >
+                      <option value="private">Private</option>
+                      <option value="public">Public</option>
+                    </select>
+
+                    {flow?.privacy === 'public' && <div className="h-6 w-px bg-white/10" />}
+
+                    {flow?.privacy === 'public' && (
+                      <select
+                        value={flow.public_mode ?? 1}
+                        onChange={(e) => updatePublicMode(Number(e.target.value))}
+                        className="h-8 rounded-md bg-transparent px-2 text-sm outline-none"
+                        title="Public view mode"
+                      >
+                        <option value={1}>No earnings</option>
+                        <option value={2}>Show earnings</option>
+                        <option value={3}>Earnings + details</option>
+                      </select>
+                    )}
+                  </div>
+
+                  {/* Group 2: Share popover */}
+                  {flow?.privacy === 'public' && (
+                    <Popover className="relative flex-none">
+                      {({ open }) => (
+                        <>
+                          <Popover.Button
+                            className={`h-9 rounded-md border border-white/15 px-3 text-sm ${
+                              open ? 'bg-white/10' : 'hover:bg-white/10'
+                            }`}
+                          >
+                            Share
+                          </Popover.Button>
+
+                          <Transition
+                            show={open}
+                            enter="transition ease-out duration-100"
+                            enterFrom="opacity-0 translate-y-1"
+                            enterTo="opacity-100 translate-y-0"
+                            leave="transition ease-in duration-75"
+                            leaveFrom="opacity-100 translate-y-0"
+                            leaveTo="opacity-0 translate-y-1"
+                          >
+                            <Popover.Panel className="absolute right-0 z-50 mt-2 w-[min(90vw,28rem)] rounded-lg border border-white/10 bg-zinc-950 p-3 shadow-xl">
+                              <div className="flex items-center gap-2">
+                                <input
+                                  readOnly
+                                  value={shareUrl}
+                                  className="h-9 flex-1 truncate rounded-md border border-white/15 bg-black/40 px-2 text-sm"
+                                />
+                                <button
+                                  onClick={async () => {
+                                    if (shareUrl) await navigator.clipboard.writeText(shareUrl)
+                                  }}
+                                  className="h-9 flex-none rounded-md border border-white/15 px-3 text-sm hover:bg-white/10"
+                                >
+                                  Copy
+                                </button>
+                              </div>
+
+                              <div className="mt-3 flex items-center justify-between gap-2">
+                                <label className="inline-flex items-center gap-2 text-sm">
+                                  <input
+                                    type="checkbox"
+                                    className="accent-white"
+                                    checked={shareNoAmounts}
+                                    onChange={(e) => setShareNoAmounts(e.target.checked)}
+                                  />
+                                  Hide all amounts in shared link
+                                </label>
+                                <span className="text-xs text-white/60">
+                                  You can also switch public mode above.
+                                </span>
+                              </div>
+
+                              <p className="mt-2 text-xs text-white/60">
+                                Anyone with the link can view according to the selected mode.
+                              </p>
+                            </Popover.Panel>
+                          </Transition>
+                        </>
+                      )}
+                    </Popover>
+                  )}
+
+                  {/* Group 3: Actions */}
+                  <button
+                    onClick={organicLayoutAndPersist}
+                    disabled={layingOut}
+                    className="h-9 flex-none rounded-md border border-white/15 px-3 text-sm hover:bg-white/10 disabled:opacity-50"
+                    title="Re-arrange nodes organically"
+                  >
+                    {layingOut ? 'Auto-layout…' : 'Auto-layout'}
+                  </button>
+                  <Button
+                    onClick={() => setShowAddNode(true)}
+                    className="h-9 flex-none bg-emerald-600 px-3 text-sm hover:bg-emerald-700"
+                    title="Add a new node"
+                  >
+                    + Add Node
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
-        ) : (
-          <h1 className="truncate text-2xl font-semibold">{flow?.name || '…'}</h1>
-        )}
-
-        {(!isPublicViewer || publicMode >= 2) && (
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs">
-              {fmtUSD(daily)} <span className="text-white/60">/ day</span>
-            </span>
-            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs">
-              {fmtUSD(monthly)} <span className="text-white/60">/ mo</span>
-            </span>
-            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs">
-              {fmtUSD(yearly)} <span className="text-white/60">/ yr</span>
-            </span>
-          </div>
-        )}
-      </div>
-
-{/* Right: grouped controls */}
-<div className="flex items-center gap-3">
-  {/* scroller for most controls (keeps horizontal scroll) */}
-  <div className="flex items-center gap-3 overflow-x-auto flex-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-    {isOwner && (
-      <>
-        {/* Group 1: Visibility */}
-        <div className="flex flex-none items-center gap-1 rounded-md border border-white/15 bg-black/40 p-1">
-          <select
-            value={flow?.privacy || 'private'}
-            onChange={(e) => updatePrivacy(e.target.value as 'private' | 'public')}
-            className="h-8 rounded-md bg-transparent px-2 text-sm outline-none"
-            title="Privacy"
-          >
-            <option value="private">Private</option>
-            <option value="public">Public</option>
-          </select>
-
-          {flow?.privacy === 'public' && <div className="h-6 w-px bg-white/10" />}
-
-          {flow?.privacy === 'public' && (
-            <select
-              value={flow.public_mode ?? 1}
-              onChange={(e) => updatePublicMode(Number(e.target.value))}
-              className="h-8 rounded-md bg-transparent px-2 text-sm outline-none"
-              title="Public view mode"
-            >
-              <option value={1}>No earnings</option>
-              <option value={2}>Show earnings</option>
-              <option value={3}>Earnings + details</option>
-            </select>
-          )}
         </div>
-
-        {/* Group 3: Actions */}
-        <button
-          onClick={organicLayoutAndPersist}
-          disabled={layingOut}
-          className="h-9 flex-none rounded-md border border-white/15 px-3 text-sm hover:bg-white/10 disabled:opacity-50"
-          title="Re-arrange nodes organically"
-        >
-          {layingOut ? 'Auto-layout…' : 'Auto-layout'}
-        </button>
-        <Button
-          onClick={() => setShowAddNode(true)}
-          className="h-9 flex-none bg-emerald-600 px-3 text-sm hover:bg-emerald-700"
-          title="Add a new node"
-        >
-          + Add Node
-        </Button>
-      </>
-    )}
-  </div>
-
-  {/* Share popover OUTSIDE the scroller so it isn’t clipped */}
-  {isOwner && flow?.privacy === 'public' && (
-    <Popover className="relative flex-none">
-      {({ open }) => (
-        <>
-          <Popover.Button
-            type="button"
-            className={`h-9 rounded-md border border-white/15 px-3 text-sm ${open ? 'bg-white/10' : 'hover:bg-white/10'}`}
-          >
-            Share
-          </Popover.Button>
-
-          <Transition
-            show={open}
-            enter="transition ease-out duration-100"
-            enterFrom="opacity-0 translate-y-1"
-            enterTo="opacity-100 translate-y-0"
-            leave="transition ease-in duration-75"
-            leaveFrom="opacity-100 translate-y-0"
-            leaveTo="opacity-0 translate-y-1"
-          >
-            <Popover.Panel className="absolute right-0 z-50 mt-2 w-[min(90vw,28rem)] rounded-lg border border-white/10 bg-zinc-950 p-3 shadow-xl">
-              <div className="flex items-center gap-2">
-                <input
-                  readOnly
-                  value={shareUrl}
-                  className="h-9 flex-1 truncate rounded-md border border-white/15 bg-black/40 px-2 text-sm"
-                />
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if (!shareUrl) return
-                    try {
-                      await navigator.clipboard.writeText(shareUrl)
-                    } catch {
-                      // fallback for http / older browsers
-                      const ta = document.createElement('textarea')
-                      ta.value = shareUrl
-                      document.body.appendChild(ta)
-                      ta.select()
-                      document.execCommand('copy')
-                      document.body.removeChild(ta)
-                    }
-                  }}
-                  className="h-9 flex-none rounded-md border border-white/15 px-3 text-sm hover:bg-white/10"
-                >
-                  Copy
-                </button>
-              </div>
-              <p className="mt-2 text-xs text-white/60">
-                Anyone with the link can view according to the selected mode.
-              </p>
-            </Popover.Panel>
-          </Transition>
-        </>
-      )}
-    </Popover>
-  )}
-</div>
-
-    </div>
-  </div>
-</div>
+      </div>
 
       {/* Canvas */}
       <div className="mx-auto max-w-6xl px-4 py-4">
@@ -562,8 +669,9 @@ export default function FlowPage() {
           edges={rfEdges}
           onNodeClick={(rfNode) => {
             if (!canOpenDetails) return
-            const real = nodes.find(n => n.id === rfNode.id)
-            if (real) setSelectedNode(real)
+            const real = edges.find(n => n.id === rfNode.id) // not used here but kept pattern
+            const actual = nodes.find(n => n.id === rfNode.id)
+            if (actual) setSelectedNode(actual)
           }}
           onEdgeClick={(rfEdge) => {
             if (!canOpenDetails) return
