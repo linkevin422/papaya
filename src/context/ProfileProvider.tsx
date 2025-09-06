@@ -4,25 +4,26 @@ import {
   createContext,
   useContext,
   useEffect,
-  useRef,
   useState,
   ReactNode,
 } from 'react'
 import { createClient } from '@/lib/supabase'
-import type { AuthChangeEvent, Session } from '@supabase/supabase-js'
+
+export type SubscriptionLevel = 'basic' | 'pro'
 
 type Profile = {
   id: string
   email: string | null
   handle: string | null
   name: string | null
-  subscription_level: 'basic' | 'pro' | null
+  subscription_level: SubscriptionLevel | null
   created_at: string
   updated_at: string
 }
 
 type ProfileContextType = {
   profile: Profile | null
+  loading: boolean
   refresh: () => Promise<void>
 }
 
@@ -31,76 +32,54 @@ const ProfileContext = createContext<ProfileContextType | undefined>(undefined)
 export function ProfileProvider({ children }: { children: ReactNode }) {
   const supabase = createClient()
   const [profile, setProfile] = useState<Profile | null>(null)
-  const [initialized, setInitialized] = useState(false)
-  const mountedRef = useRef(false)
+  const [loading, setLoading] = useState(true)
 
   const fetchProfile = async () => {
+    setLoading(true)
     try {
-      console.log('[debug] fetching session...')
-      const { data: sessionData, error } = await supabase.auth.getSession()
-      console.log('[debug] sessionData:', sessionData)
-      console.log('[debug] session error:', error)
-
+      const { data: sessionData } = await supabase.auth.getSession()
       const session = sessionData.session
-
-      if (!session?.user) {
-        console.log('[debug] no session user, setting profile null')
+      if (!session) {
         setProfile(null)
-      } else {
-        const { data } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
-        setProfile(data ?? null)
+        setLoading(false)
+        return
       }
-    } catch (err) {
-      console.error('[debug] fetchProfile error:', err)
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select(
+          'id,email,handle,name,subscription_level,created_at,updated_at'
+        )
+        .eq('id', session.user.id)
+        .single()
+
+      if (error) throw error
+      setProfile({
+        ...data,
+        subscription_level: (data.subscription_level ??
+          'basic') as SubscriptionLevel,
+      })
+    } catch {
       setProfile(null)
     } finally {
-      console.log('[debug] initialized true')
-      setInitialized(true)
+      setLoading(false)
     }
   }
 
   useEffect(() => {
-    if (mountedRef.current) return
-    mountedRef.current = true
-
     fetchProfile()
 
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event: AuthChangeEvent, session: Session | null) => {
-        if (!session?.user) {
-          setProfile(null)
-        } else {
-          if (session.user.id !== profile?.id) {
-            fetchProfile()
-          }
-        }
-      }
-    )
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event) => {
+      fetchProfile()
+    })
 
-    return () => {
-      listener?.subscription.unsubscribe()
-    }
-  }, [])
-
-  if (!initialized) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <span className="text-sm opacity-70">Loading…</span>
-      </div>
-    )
-  }
+    return () => subscription.unsubscribe()
+  }, []) // eslint-disable-line
 
   return (
-    <ProfileContext.Provider
-      value={{
-        profile,
-        refresh: fetchProfile,
-      }}
-    >
+    <ProfileContext.Provider value={{ profile, loading, refresh: fetchProfile }}>
       {children}
     </ProfileContext.Provider>
   )
