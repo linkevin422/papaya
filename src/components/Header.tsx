@@ -58,16 +58,25 @@ export default function Header() {
   return (
     <header className="fixed top-0 left-0 right-0 z-20 border-b border-neutral-800 bg-black/80 backdrop-blur-sm">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
-        {/* Logo + My Flow */}
+        {/* Logo + Primary nav */}
         <div className="flex items-center gap-6">
           <Link href="/" className="font-semibold">
             Papaya
           </Link>
+
           <Link
             href={profile ? (firstFlowId ? `/flows/${firstFlowId}` : '/flows') : '/login'}
             className="text-sm opacity-80 hover:opacity-100"
           >
             My Flow
+          </Link>
+
+          {/* New: Pricing link */}
+          <Link
+            href="/pricing"
+            className="text-sm opacity-80 hover:opacity-100"
+          >
+            Pricing
           </Link>
         </div>
 

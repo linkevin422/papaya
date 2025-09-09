@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase'
 import { useLanguage } from '@/context/LanguageProvider'
 
 // handle rules
@@ -18,15 +17,15 @@ const BANNED: string[] = [
   'nazi',
   'kkk',
   'isis',
-  'nigger'
+  'nigger',
 ]
 
 export default function RegisterPage() {
   const router = useRouter()
-  const supabase = createClient()
   const { t } = useLanguage()
 
   const [email, setEmail] = useState('')
+  const [name, setName] = useState('')
   const [handle, setHandle] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -41,15 +40,6 @@ export default function RegisterPage() {
   const lastRequested = useRef<string>('')
   const lastValidated = useRef<string>('')
 
-  // If already logged in, go dashboard
-  useEffect(() => {
-    const checkSession = async () => {
-      const { data } = await supabase.auth.getSession()
-      if (data.session) router.replace('/dashboard')
-    }
-    checkSession()
-  }, [router, supabase])
-
   // local validation error
   const handleError: string | null = (() => {
     if (!handle) return null
@@ -60,7 +50,7 @@ export default function RegisterPage() {
     return null
   })()
 
-  // availability check
+  // handle availability check
   useEffect(() => {
     if (!handle || handleError) {
       setHandleStatus('idle')
@@ -69,32 +59,28 @@ export default function RegisterPage() {
     if (
       lastValidated.current === handle &&
       (handleStatus === 'available' || handleStatus === 'taken')
-    ) return
+    )
+      return
 
     setHandleStatus('checking')
     const current = handle
     lastRequested.current = current
 
     const timer = setTimeout(async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('handle', current)
-        .maybeSingle()
-
-      if (lastRequested.current !== current) return
-      if (error) {
-        console.error(error)
+      try {
+        const res = await fetch('/api/check-handle?handle=' + current)
+        const { taken } = await res.json()
+        if (lastRequested.current !== current) return
+        setHandleStatus(taken ? 'taken' : 'available')
+        lastValidated.current = current
+      } catch (err) {
+        console.error(err)
         setHandleStatus('idle')
-        return
       }
-
-      setHandleStatus(data ? 'taken' : 'available')
-      lastValidated.current = current
     }, 450)
 
     return () => clearTimeout(timer)
-  }, [handle, handleError, handleStatus, supabase])
+  }, [handle, handleError, handleStatus])
 
   const passwordsMatch = confirmPassword === '' || password === confirmPassword
 
@@ -107,30 +93,22 @@ export default function RegisterPage() {
     if (handleStatus !== 'available') return setError(t('handle_not_available'))
 
     setLoading(true)
+    try {
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, name, handle }),
+      })
 
-    const origin =
-      typeof window !== 'undefined'
-        ? window.location.origin
-        : process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to register')
 
-    // Create auth user, send email link to /auth/callback
-    const { error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { handle }, // trigger will copy this into profiles.handle
-        emailRedirectTo: `${origin}/auth/callback`,
-      },
-    })
-
-    if (signUpError) {
-      setError(signUpError.message)
+      setEmailSent(true)
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
       setLoading(false)
-      return
     }
-
-    setLoading(false)
-    setEmailSent(true)
   }
 
   if (emailSent) {
@@ -171,6 +149,16 @@ export default function RegisterPage() {
           placeholder={t('email')}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          className="w-full mb-4 p-3 rounded bg-zinc-800 text-white placeholder-gray-400 border border-zinc-700 focus:outline-none"
+          required
+        />
+
+        {/* Name */}
+        <input
+          type="text"
+          placeholder={t('name') || 'Name'}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
           className="w-full mb-4 p-3 rounded bg-zinc-800 text-white placeholder-gray-400 border border-zinc-700 focus:outline-none"
           required
         />
@@ -229,7 +217,9 @@ export default function RegisterPage() {
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
           className={`w-full mb-2 p-3 rounded placeholder-gray-400 focus:outline-none bg-zinc-800 text-white ${
-            confirmPassword && !passwordsMatch ? 'border border-red-500' : 'border border-zinc-700'
+            confirmPassword && !passwordsMatch
+              ? 'border border-red-500'
+              : 'border border-zinc-700'
           }`}
           required
         />
@@ -248,6 +238,7 @@ export default function RegisterPage() {
             handleStatus !== 'available' ||
             !passwordsMatch ||
             !email ||
+            !name ||
             !handle ||
             !password ||
             !confirmPassword

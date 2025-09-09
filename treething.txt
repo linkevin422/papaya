@@ -1,1 +1,12 @@
-tree -I "node_modules|.next|.git" -L 6
+tree -I "node_modules|.next|.git" -L 8
+
+sql to clear everything
+
+TRUNCATE TABLE
+  profiles,
+  flows,
+  nodes,
+  edges
+RESTART IDENTITY CASCADE;
+
+

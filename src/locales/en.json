@@ -30,6 +30,7 @@
     "billing": "billing",
     "email_sent": "Email sent!",
     "check_your_inbox": "Check your inbox to confirm your email.",
-    "go_to_email": "Go to your email"
+    "go_to_email": "Go to your email",
+    "name": "Name"
   }
   
