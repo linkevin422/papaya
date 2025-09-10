@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import { useProfile } from '@/context/ProfileProvider'
 
 type Flow = {
   id: string
@@ -17,6 +18,7 @@ type Flow = {
 export default function DashboardPage() {
   const supabase = createClient()
   const router = useRouter()
+  const { profile } = useProfile()
   const [flows, setFlows] = useState<Flow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -74,12 +76,25 @@ export default function DashboardPage() {
       <section className="rounded-2xl border border-neutral-800 p-4">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-base font-medium">🗺️ Your Flows</h3>
-          <Link
-            href="/flows/new"
-            className="rounded-lg border border-neutral-700 px-3 py-1.5 text-sm hover:bg-neutral-900"
-          >
-            New Flow
-          </Link>
+
+          {/* Guarded New Flow button */}
+          {!loading && (
+            profile?.subscription_level === 'pro' || flows.length === 0 ? (
+              <Link
+                href="/flows/new"
+                className="rounded-lg border border-neutral-700 px-3 py-1.5 text-sm hover:bg-neutral-900"
+              >
+                New Flow
+              </Link>
+            ) : (
+              <button
+                disabled
+                className="rounded-lg border border-neutral-800 px-3 py-1.5 text-sm text-neutral-600 cursor-not-allowed"
+              >
+                New Flow (Upgrade to unlock)
+              </button>
+            )
+          )}
         </div>
 
         {loading && (
@@ -97,10 +112,11 @@ export default function DashboardPage() {
         {!loading && !error && flows.length === 0 && (
           <div className="rounded-lg border border-neutral-800 p-4 text-sm text-neutral-400">
             You don't have any flows yet.
-            <Link href="/flows/new" className="ml-2 underline hover:no-underline">
-              Create your first flow
-            </Link>
-            .
+            {profile?.subscription_level === 'pro' && (
+              <Link href="/flows/new" className="ml-2 underline hover:no-underline">
+                Create your first flow
+              </Link>
+            )}
           </div>
         )}
 

@@ -10,3 +10,13 @@ TRUNCATE TABLE
 RESTART IDENTITY CASCADE;
 
 
+# just the flows
+
+DELETE FROM edges;
+DELETE FROM nodes;
+DELETE FROM flows;
+
+-- If you want to reset the IDs back to 1:
+ALTER SEQUENCE edges_id_seq RESTART WITH 1;
+ALTER SEQUENCE nodes_id_seq RESTART WITH 1;
+ALTER SEQUENCE flows_id_seq RESTART WITH 1;

@@ -29,7 +29,7 @@ export default function CreateFlowForm() {
         user_id: user.id,
         name: name.trim(),
       })
-      .select()
+      .select('*')
       .single()
 
     setLoading(false)
