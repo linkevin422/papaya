@@ -104,29 +104,36 @@ export default function Header() {
             </button>
 
             {menuOpen && (
-              <div className="absolute right-0 mt-2 w-48 overflow-hidden rounded-lg border border-neutral-800 bg-neutral-950 shadow-xl">
-                <Link
-                  href="/dashboard"
-                  className="block px-4 py-2 text-sm hover:bg-neutral-900"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  {t('dashboard')}
-                </Link>
-                <Link
-                  href="/dashboard/settings"
-                  className="block px-4 py-2 text-sm hover:bg-neutral-900"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  {t('settings')}
-                </Link>
-                <button
-                  onClick={handleLogout}
-                  className="w-full px-4 py-2 text-left text-sm hover:bg-neutral-900"
-                >
-                  {t('logout')}
-                </button>
-              </div>
-            )}
+  <div className="absolute right-0 mt-2 w-52 overflow-hidden rounded-lg border border-neutral-800 bg-neutral-950 shadow-xl">
+    {/* Show current subscription */}
+    <div className="px-4 py-2 text-sm text-neutral-400 border-b border-neutral-800">
+      {profile.subscription_level === 'pro' ? 'Pro User' : 'Basic User'}
+    </div>
+
+    <Link
+      href="/dashboard"
+      className="block px-4 py-2 text-sm hover:bg-neutral-900"
+      onClick={() => setMenuOpen(false)}
+    >
+      {t('dashboard')}
+    </Link>
+
+    <Link
+      href={profile ? (firstFlowId ? `/flows/${firstFlowId}` : '/flows') : '/login'}
+      className="block px-4 py-2 text-sm hover:bg-neutral-900"
+      onClick={() => setMenuOpen(false)}
+    >
+      Flows
+    </Link>
+
+    <button
+      onClick={handleLogout}
+      className="w-full px-4 py-2 text-left text-sm hover:bg-neutral-900"
+    >
+      {t('logout')}
+    </button>
+  </div>
+)}
           </div>
         ) : (
           <div className="flex items-center gap-4">
