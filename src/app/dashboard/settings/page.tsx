@@ -144,36 +144,81 @@ export default function SettingsPage() {
 
       <hr className="border-neutral-800" />
 
-      <div className="space-y-2">
-        <h2 className="text-sm font-semibold text-red-400">Danger Zone</h2>
-        {!confirmDelete ? (
+      {/* Billing section */}
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-sm font-semibold">Billing</h2>
           <button
-            onClick={() => setConfirmDelete(true)}
-            className="text-sm text-red-500 hover:underline"
+            onClick={async () => {
+              setMsg(null)
+              const {
+                data: { user },
+              } = await supabase.auth.getUser()
+              if (!user) {
+                window.location.href = '/login'
+                return
+              }
+              const { data: profileData } = await supabase
+                .from('profiles')
+                .select('stripe_customer_id')
+                .eq('id', user.id)
+                .single()
+              const customerId = profileData?.stripe_customer_id
+              if (!customerId) {
+                setMsg('No Stripe customer ID found.')
+                return
+              }
+              const res = await fetch('/api/portal', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ customerId }),
+              })
+              const json = await res.json()
+              if (json.url) {
+                window.location.href = json.url
+              } else {
+                setMsg(json.error || 'Failed to open billing portal')
+              }
+            }}
+            className="rounded-lg px-4 py-2 bg-neutral-100 text-neutral-900 text-sm mt-2"
           >
-            Delete account
+            Manage Subscription
           </button>
-        ) : (
-          <div className="space-y-2">
-            <p className="text-sm opacity-80">
-              Are you sure? This cannot be undone.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={deleteAccount}
-                className="rounded-lg px-3 py-2 text-sm bg-red-600 text-white"
-              >
-                Confirm delete
-              </button>
-              <button
-                onClick={() => setConfirmDelete(false)}
-                className="rounded-lg px-3 py-2 text-sm bg-neutral-800 text-white"
-              >
-                Cancel
-              </button>
+        </div>
+
+        <hr className="border-neutral-800" />
+
+        <div>
+          <h2 className="text-sm font-semibold text-red-400">Danger Zone</h2>
+          {!confirmDelete ? (
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="text-sm text-red-500 hover:underline"
+            >
+              Delete account
+            </button>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-sm opacity-80">
+                Are you sure? This cannot be undone.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={deleteAccount}
+                  className="rounded-lg px-3 py-2 text-sm bg-red-600 text-white"
+                >
+                  Confirm delete
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  className="rounded-lg px-3 py-2 text-sm bg-neutral-800 text-white"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   )
