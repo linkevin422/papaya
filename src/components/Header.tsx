@@ -19,7 +19,6 @@ export default function Header() {
     window.location.href = '/login'
   }
 
-  // Close dropdown on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -39,7 +38,6 @@ export default function Header() {
     }
   }, [menuOpen])
 
-  // Fetch user's first flow
   useEffect(() => {
     const fetchFirstFlow = async () => {
       if (!profile) return
@@ -60,9 +58,17 @@ export default function Header() {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
         {/* Logo + Primary nav */}
         <div className="flex items-center gap-6">
-          <Link href="/" className="font-semibold">
-            Papaya
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href="/" className="font-semibold">
+              Papaya
+            </Link>
+            <Link
+              href="/about"
+              className="text-sm opacity-80 hover:opacity-100"
+            >
+              About
+            </Link>
+          </div>
 
           <Link
             href={profile ? (firstFlowId ? `/flows/${firstFlowId}` : '/flows') : '/login'}
@@ -71,7 +77,6 @@ export default function Header() {
             My Flow
           </Link>
 
-          {/* New: Pricing link */}
           <Link
             href="/pricing"
             className="text-sm opacity-80 hover:opacity-100"
@@ -104,36 +109,35 @@ export default function Header() {
             </button>
 
             {menuOpen && (
-  <div className="absolute right-0 mt-2 w-52 overflow-hidden rounded-lg border border-neutral-800 bg-neutral-950 shadow-xl">
-    {/* Show current subscription */}
-    <div className="px-4 py-2 text-sm text-neutral-400 border-b border-neutral-800">
-      {profile.subscription_level === 'pro' ? 'Pro User' : 'Basic User'}
-    </div>
+              <div className="absolute right-0 mt-2 w-52 overflow-hidden rounded-lg border border-neutral-800 bg-neutral-950 shadow-xl">
+                <div className="px-4 py-2 text-sm text-neutral-400 border-b border-neutral-800">
+                  {profile.subscription_level === 'pro' ? 'Pro User' : 'Basic User'}
+                </div>
 
-    <Link
-      href="/dashboard"
-      className="block px-4 py-2 text-sm hover:bg-neutral-900"
-      onClick={() => setMenuOpen(false)}
-    >
-      {t('dashboard')}
-    </Link>
+                <Link
+                  href="/dashboard"
+                  className="block px-4 py-2 text-sm hover:bg-neutral-900"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  {t('dashboard')}
+                </Link>
 
-    <Link
-      href={profile ? (firstFlowId ? `/flows/${firstFlowId}` : '/flows') : '/login'}
-      className="block px-4 py-2 text-sm hover:bg-neutral-900"
-      onClick={() => setMenuOpen(false)}
-    >
-      Flows
-    </Link>
+                <Link
+                  href={profile ? (firstFlowId ? `/flows/${firstFlowId}` : '/flows') : '/login'}
+                  className="block px-4 py-2 text-sm hover:bg-neutral-900"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  Flows
+                </Link>
 
-    <button
-      onClick={handleLogout}
-      className="w-full px-4 py-2 text-left text-sm hover:bg-neutral-900"
-    >
-      {t('logout')}
-    </button>
-  </div>
-)}
+                <button
+                  onClick={handleLogout}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-neutral-900"
+                >
+                  {t('logout')}
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex items-center gap-4">
