@@ -46,26 +46,19 @@ async function addWatermark(basePngDataUrl: string, text: string): Promise<strin
 
   ctx.drawImage(img, 0, 0)
 
-  // Softer, wider watermark pattern
-  const maxDim = Math.max(canvas.width, canvas.height)
-  const step = Math.max(240, Math.floor(maxDim * 0.45)) // fewer tiles
-  const fontSize = Math.max(36, Math.floor(step * 0.22))
-
+  // Single diagonal watermark
   ctx.save()
   ctx.globalAlpha = 0.08
   ctx.fillStyle = '#ffffff'
   ctx.translate(canvas.width / 2, canvas.height / 2)
-  ctx.rotate((-28 * Math.PI) / 180)
-  ctx.translate(-canvas.width / 2, -canvas.height / 2)
-  ctx.font = `${fontSize}px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial`
+  ctx.rotate((-30 * Math.PI) / 180)
+
+  const fontSize = Math.floor(Math.min(canvas.width, canvas.height) * 0.1)
+  ctx.font = `bold ${fontSize}px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
+  ctx.fillText(text, 0, 0)
 
-  for (let y = -step; y < canvas.height + step; y += step) {
-    for (let x = -step; x < canvas.width + step; x += step) {
-      ctx.fillText(text, x, y)
-    }
-  }
   ctx.restore()
 
   return canvas.toDataURL('image/png')

@@ -13,7 +13,7 @@ export default function NewFlowPage() {
   const [flowCount, setFlowCount] = useState<number | null>(null)
 
   useEffect(() => {
-    if (!loading && profile?.subscription_level === 'basic') {
+    if (!loading && profile) {
       const fetchCount = async () => {
         const { count, error } = await supabase
           .from('flows')
@@ -25,12 +25,17 @@ export default function NewFlowPage() {
   }, [loading, profile, supabase])
 
   useEffect(() => {
-    if (flowCount !== null && profile?.subscription_level === 'basic' && flowCount > 0) {
-      router.replace('/pricing')
+    if (flowCount !== null && profile) {
+      if (profile.subscription_level === 'basic' && flowCount > 0) {
+        router.replace('/pricing')
+      }
+      if (profile.subscription_level === 'pro' && flowCount >= 10) {
+        router.replace('/pricing')
+      }
     }
   }, [flowCount, profile, router])
 
-  if (loading || (profile?.subscription_level === 'basic' && flowCount === null)) {
+  if (loading || flowCount === null) {
     return null
   }
 

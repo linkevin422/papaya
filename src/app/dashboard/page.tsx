@@ -54,6 +54,18 @@ export default function DashboardPage() {
     load()
   }, [supabase, router])
 
+  // determine if user can create a new flow
+  const canCreateFlow = () => {
+    if (!profile) return false
+    if (profile.subscription_level === 'basic') {
+      return flows.length === 0
+    }
+    if (profile.subscription_level === 'pro') {
+      return flows.length < 10
+    }
+    return false
+  }
+
   return (
     <div className="space-y-6">
       <section className="rounded-2xl border border-neutral-800 p-4">
@@ -77,9 +89,8 @@ export default function DashboardPage() {
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-base font-medium">🗺️ Your Flows</h3>
 
-          {/* Guarded New Flow button */}
           {!loading && (
-            profile?.subscription_level === 'pro' || flows.length === 0 ? (
+            canCreateFlow() ? (
               <Link
                 href="/flows/new"
                 className="rounded-lg border border-neutral-700 px-3 py-1.5 text-sm hover:bg-neutral-900"
@@ -112,7 +123,7 @@ export default function DashboardPage() {
         {!loading && !error && flows.length === 0 && (
           <div className="rounded-lg border border-neutral-800 p-4 text-sm text-neutral-400">
             You don't have any flows yet.
-            {profile?.subscription_level === 'pro' && (
+            {canCreateFlow() && (
               <Link href="/flows/new" className="ml-2 underline hover:no-underline">
                 Create your first flow
               </Link>
