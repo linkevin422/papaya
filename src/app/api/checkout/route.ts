@@ -16,7 +16,7 @@ async function getStripe() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { priceId, successUrl, cancelUrl, customerId, mode = 'subscription' } = await req.json()
+    const { priceId, successUrl, cancelUrl, customerId } = await req.json()
     const stripe = await getStripe()
 
     const origin =
@@ -24,21 +24,27 @@ export async function POST(req: NextRequest) {
       process.env.NEXT_PUBLIC_APP_URL ??
       'http://localhost:3000'
 
-    // Get the current user id on the server so we can pass it to Stripe metadata
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    const userId = user?.id
-
-    const session = await stripe.checkout.sessions.create({
-      mode,
-      customer: customerId, // ok to omit and let Stripe create a new one
-      line_items: [{ price: priceId, quantity: 1 }],
-      success_url: successUrl ?? `${origin}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: cancelUrl ?? `${origin}/billing/cancel`,
-      allow_promotion_codes: true,
-      metadata: userId ? { userId } : undefined,
-    })
-
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      
+      const userId = user?.id ?? undefined
+      const email = user?.email ?? undefined
+      
+      const session = await stripe.checkout.sessions.create({
+        mode: 'subscription',
+        customer: customerId || undefined,                 // use existing if you have it
+        customer_email: !customerId ? email : undefined,   // otherwise bind to Supabase email
+        client_reference_id: userId,                       // extra handle for webhook
+        line_items: [{ price: priceId, quantity: 1 }],
+        success_url: successUrl ?? `${origin}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: cancelUrl ?? `${origin}/pricing`,
+        allow_promotion_codes: true,
+        metadata: userId ? { userId } : undefined,         // surface userId on session
+        subscription_data: userId ? { metadata: { userId } } : undefined, // and on subscription
+      })
+              
     return NextResponse.json({ url: session.url })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? 'Checkout failed' }, { status: 500 })

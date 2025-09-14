@@ -1,6 +1,6 @@
 tree -I "node_modules|.next|.git" -L 8
 
-sql to clear everything
+--- sql to clear everything ---
 
 TRUNCATE TABLE
   profiles,
@@ -15,3 +15,7 @@ RESTART IDENTITY CASCADE;
 DELETE FROM edges;
 DELETE FROM nodes;
 DELETE FROM flows;
+
+
+--- to test stripe payment ---
+stripe listen --forward-to localhost:3000/api/webhooks/stripe

@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { useProfile } from '@/context/ProfileProvider'
@@ -11,13 +11,23 @@ type Row = {
   pro: string
 }
 
+// extend the Profile type so TS knows about these fields
+type Profile = {
+  handle: string
+  display_name: string
+  locale: string
+  subscription_level?: string | null
+  stripe_customer_id?: string | null
+}
+
 export default function PricingPage() {
   const router = useRouter()
   const supabase = createClient()
-  const { profile } = useProfile()
+  const { profile } = useProfile() as { profile: Profile | null }
 
   const isLoggedIn = !!profile
   const plan = profile?.subscription_level ?? 'basic'
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
 
   const rows: Row[] = [
     { feature: 'Max flows', basic: '1', pro: '10' },
@@ -26,21 +36,53 @@ export default function PricingPage() {
     { feature: 'Nodes and edges', basic: 'No cap', pro: 'No cap' },
   ]
 
-  const handlePrimaryCta = async () => {
+  const handleUpgrade = async (cycle: 'monthly' | 'yearly') => {
     if (!isLoggedIn) {
       router.push('/login')
       return
     }
     if (plan === 'pro') return
-    // Take them to your billing flow, you will wire it next
-    router.push('/billing')
+
+    const { data: userData } = await supabase.auth.getUser()
+    const userId = userData.user?.id
+
+    // Select the right priceId
+    const priceId =
+      cycle === 'monthly'
+        ? process.env.NEXT_PUBLIC_PRICE_PAPAYA_MONTHLY
+        : process.env.NEXT_PUBLIC_PRICE_PAPAYA_YEARLY
+
+    const payload: any = {
+      priceId,
+      successUrl: `${window.location.origin}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancelUrl: `${window.location.origin}/pricing`,
+      mode: 'subscription',
+      metadata: { userId },
+    }
+
+    if (profile?.stripe_customer_id) {
+      payload.customerId = profile.stripe_customer_id
+    }
+
+    const res = await fetch('/api/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+
+    const json = await res.json()
+    if (json.url) {
+      window.location.href = json.url
+    } else {
+      console.error(json.error || 'Checkout failed')
+    }
   }
 
   const proButtonText = useMemo(() => {
     if (!isLoggedIn) return 'Sign in to upgrade'
     if (plan === 'pro') return 'You are on Pro'
-    return 'Upgrade to Pro'
-  }, [isLoggedIn, plan])
+    return billingCycle === 'monthly' ? 'Upgrade – Monthly' : 'Upgrade – Yearly'
+  }, [isLoggedIn, plan, billingCycle])
 
   const proButtonDisabled = isLoggedIn && plan === 'pro'
 
@@ -99,7 +141,7 @@ export default function PricingPage() {
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold">Pro</h2>
             <span className="rounded-full bg-neutral-800 px-3 py-1 text-xs text-neutral-300">
-              Pricing soon
+              Paid
             </span>
           </div>
           <p className="mt-2 text-sm text-neutral-300">
@@ -121,10 +163,30 @@ export default function PricingPage() {
             </li>
           </ul>
 
+          {/* Billing cycle selector */}
+          <div className="mt-6 flex items-center justify-center gap-2 rounded-full bg-neutral-800 p-1 text-xs">
+            <button
+              onClick={() => setBillingCycle('monthly')}
+              className={`flex-1 rounded-full px-3 py-1 ${
+                billingCycle === 'monthly' ? 'bg-white text-black' : 'text-neutral-400'
+              }`}
+            >
+              Monthly
+            </button>
+            <button
+              onClick={() => setBillingCycle('yearly')}
+              className={`flex-1 rounded-full px-3 py-1 ${
+                billingCycle === 'yearly' ? 'bg-white text-black' : 'text-neutral-400'
+              }`}
+            >
+              Yearly
+            </button>
+          </div>
+
           <button
             disabled={proButtonDisabled}
-            onClick={handlePrimaryCta}
-            className={`mt-8 w-full rounded-xl px-4 py-3 text-center text-sm font-medium ${
+            onClick={() => handleUpgrade(billingCycle)}
+            className={`mt-6 w-full rounded-xl px-4 py-3 text-center text-sm font-medium ${
               proButtonDisabled
                 ? 'cursor-not-allowed bg-neutral-800 text-neutral-500'
                 : 'bg-white text-black hover:opacity-90'
@@ -162,28 +224,6 @@ export default function PricingPage() {
             ))}
           </tbody>
         </table>
-      </div>
-
-      {/* FAQ stub */}
-      <div className="mt-10 grid gap-6 md:grid-cols-3">
-        <div className="rounded-xl border border-neutral-800 p-4">
-          <h3 className="text-sm font-semibold">Can I change plans later?</h3>
-          <p className="mt-2 text-sm text-neutral-300">
-            Yes. You can upgrade to Pro on the billing page when you are ready.
-          </p>
-        </div>
-        <div className="rounded-xl border border-neutral-800 p-4">
-          <h3 className="text-sm font-semibold">What is included in Pro?</h3>
-          <p className="mt-2 text-sm text-neutral-300">
-            Ten flows and clean exports across PNG, PDF, CSV, and JSON.
-          </p>
-        </div>
-        <div className="rounded-xl border border-neutral-800 p-4">
-          <h3 className="text-sm font-semibold">Do you cap nodes or edges?</h3>
-          <p className="mt-2 text-sm text-neutral-300">
-            No. Both Basic and Pro have no caps on nodes or edges.
-          </p>
-        </div>
       </div>
     </div>
   )

@@ -1,32 +1,40 @@
-'use client';
+'use client'
+import { useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 
-import { Suspense } from 'react';
-import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+export default function BillingSuccess() {
+  const sp = useSearchParams()
+  const router = useRouter()
+  const [msg, setMsg] = useState('Finalizing…')
 
-export const dynamic = 'force-dynamic';
-
-function SuccessContent() {
-  const qp = useSearchParams();
-  const sessionId = qp.get('session_id') ?? '';
+  useEffect(() => {
+    const sessionId = sp.get('session_id')
+    if (!sessionId) return
+    ;(async () => {
+      try {
+        setMsg('Activating your Pro plan…')
+        const res = await fetch(`/api/billing/sync?session_id=${encodeURIComponent(sessionId)}`, {
+          method: 'GET',
+          credentials: 'include',
+        })
+        const text = await res.text()
+        // debug: show what came back
+        console.log('sync raw:', text)
+        const json = JSON.parse(text)
+        if (!res.ok || !json.ok) throw new Error(json.error || 'sync failed')
+        setMsg('Pro activated. Redirecting…')
+        setTimeout(() => router.push('/pricing'), 600)
+      } catch (e) {
+        console.error(e)
+        setMsg('Activation failed. Try refresh.')
+      }
+    })()
+  }, [sp, router])
 
   return (
-    <>
+    <div className="mx-auto max-w-lg p-6">
       <h1 className="text-2xl font-semibold">Payment successful ✅</h1>
-      <p className="opacity-80">Checkout session: {sessionId || '(none)'}</p>
-      <Link href="/" className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20">
-        Go to app
-      </Link>
-    </>
-  );
-}
-
-export default function SuccessPage() {
-  return (
-    <main className="min-h-screen flex flex-col items-center justify-center gap-4 p-10">
-      <Suspense fallback={<p className="opacity-60">Loading…</p>}>
-        <SuccessContent />
-      </Suspense>
-    </main>
-  );
+      <p className="mt-2 text-sm text-neutral-400">{msg}</p>
+    </div>
+  )
 }
