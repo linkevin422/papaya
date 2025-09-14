@@ -48,8 +48,8 @@ export default function TermsPage() {
 
       <h2 className="text-xl font-semibold text-white mt-8 mb-3">6. Disclaimer & Limitation of Liability</h2>
       <p className="mb-4">
-        Papaya is provided "as is" without warranties of any kind. We are not liable for 
-        damages, losses, or issues arising from your use of the service.
+        {`Papaya is provided "as is" without warranties of any kind. We are not liable for 
+        damages, losses, or issues arising from your use of the service.`}
       </p>
 
       <h2 className="text-xl font-semibold text-white mt-8 mb-3">7. Changes to Terms</h2>
