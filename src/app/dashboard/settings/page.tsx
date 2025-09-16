@@ -9,6 +9,7 @@ type Profile = {
   handle: string
   display_name: string
   locale: string
+  master_currency: string
 }
 
 export default function SettingsPage() {
@@ -16,6 +17,7 @@ export default function SettingsPage() {
     handle: '',
     display_name: '',
     locale: 'en',
+    master_currency: 'TWD',
   })
   const [loading, setLoading] = useState(true)
   const [msg, setMsg] = useState<string | null>(null)
@@ -33,7 +35,7 @@ export default function SettingsPage() {
       }
       const { data, error } = await supabase
         .from('profiles')
-        .select('handle, display_name, locale')
+        .select('handle, display_name, locale, master_currency')
         .eq('id', session.user.id)
         .single()
       if (!mounted) return
@@ -42,6 +44,7 @@ export default function SettingsPage() {
           handle: data.handle || '',
           display_name: data.display_name || '',
           locale: data.locale || 'en',
+          master_currency: data.master_currency || 'TWD',
         })
       } else {
         console.error(error)
@@ -128,7 +131,29 @@ export default function SettingsPage() {
           }
         >
           <option value="en">English</option>
-          <option value="zh-TW">繁體中文</option>
+          <option value="zh_tw">繁體中文</option>
+        </select>
+      </label>
+
+      <label className="block">
+        <span className="text-sm opacity-80">Master Currency</span>
+        <select
+          className="mt-1 w-full rounded-lg bg-neutral-900 border border-neutral-800 px-3 py-2"
+          value={profile.master_currency}
+          onChange={(e) =>
+            setProfile((p) => ({ ...p, master_currency: e.target.value }))
+          }
+        >
+          <option value="TWD">NTD (New Taiwan Dollar)</option>
+          <option value="USD">USD (US Dollar)</option>
+          <option value="EUR">EUR (Euro)</option>
+          <option value="JPY">JPY (Japanese Yen)</option>
+          <option value="CAD">CAD (Canadian Dollar)</option>
+          <option value="GBP">GBP (British Pound)</option>
+          <option value="AUD">AUD (Australian Dollar)</option>
+          <option value="HKD">HKD (Hong Kong Dollar)</option>
+          <option value="CNY">CNY (Chinese Yuan)</option>
+          <option value="SGD">SGD (Singapore Dollar)</option>
         </select>
       </label>
 

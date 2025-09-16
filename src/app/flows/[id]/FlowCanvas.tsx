@@ -35,6 +35,7 @@ type Props = {
   onNodeClick: (node: { id: string }) => void
   onEdgeClick: (edge: { id: string }) => void
   refresh: () => void
+  viewMode: 'daily' | 'monthly' | 'yearly'
 }
 
 export default function FlowCanvas({
@@ -44,6 +45,7 @@ export default function FlowCanvas({
   onNodeClick,
   onEdgeClick,
   refresh,
+  viewMode,
 }: Props) {
   const [nodesState, setNodesState, onNodesChange] = useNodesState(nodes)
   const [edgesState, setEdgesState, onEdgesChange] = useEdgesState(edges)
@@ -138,6 +140,12 @@ export default function FlowCanvas({
 
   return (
     <div className="relative h-[80vh] w-full">
+
+<div className="absolute left-3 top-3 z-10 text-white/50 text-sm" data-export-ignore="true">
+  View: <span className="font-mono text-white">{viewMode}</span>
+</div>
+
+      
       {/* Tiny export menu (ignored in exports) */}
 {/* Tiny export menu (ignored in exports) */}
 <div

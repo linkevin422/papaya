@@ -10,6 +10,12 @@ import AddNodeForm from './AddNodeForm'
 import { MarkerType } from 'reactflow'
 import { Dialog, Popover, Transition } from '@headlessui/react'
 import { Button } from '@/components/ui/button'
+import FlowSwitcher from '@/components/FlowSwitcher'
+import TimeframeSwitcher from '@/components/TimeframeSwitcher'
+import { useProfile } from '@/context/ProfileProvider'
+import { getLatestRates } from '@/lib/rates'
+
+
 
 const supabase = createClient()
 
@@ -83,6 +89,7 @@ type ViewMode = 'daily' | 'monthly' | 'yearly'
 export default function FlowPage() {
   const urlParam = useParams().id as string
   const qs = useSearchParams()
+  const { profile } = useProfile()  // ✅ get profile so master_currency works
 
   const [flow, setFlow] = useState<Flow | null>(null)
   const [notFound, setNotFound] = useState(false)
@@ -95,10 +102,16 @@ export default function FlowPage() {
   const [showAddNode, setShowAddNode] = useState(false)
   const [layingOut, setLayingOut] = useState(false)
 
-  // headline totals
-  const [daily, setDaily] = useState<number>(0)
-  const [monthly, setMonthly] = useState<number>(0)
-  const [yearly, setYearly] = useState<number>(0)
+// headline totals
+const [daily, setDaily] = useState<number>(0)
+const [monthly, setMonthly] = useState<number>(0)
+const [yearly, setYearly] = useState<number>(0)
+
+// exchange rates
+const [rates, setRates] = useState<Record<string, number>>({})
+useEffect(() => {
+  getLatestRates().then(setRates)
+}, [])
 
   // global view controls
   const [viewMode, setViewMode] = useState<ViewMode>('monthly')
@@ -258,6 +271,19 @@ export default function FlowPage() {
     typeof window !== 'undefined' && flow
       ? `${window.location.origin}/flows/${flow.share_id}${shareNoAmounts ? '?no_amounts=1' : ''}`
       : ''
+
+      function fmtCurrency(n: number, currency: string) {
+        if (!n || !isFinite(n)) return '-'
+        const rate = rates[currency] || 1
+        const converted = n * rate
+        return new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency,
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }).format(converted)
+      }
+      
 
   // auto layout and persist node positions
   async function organicLayoutAndPersist() {
@@ -420,11 +446,11 @@ export default function FlowPage() {
               : viewMode === 'monthly'
               ? e.monthly_flow
               : e.yearly_flow
-          if (typeof val === 'number' && isFinite(val)) {
-            const suffix = viewMode === 'daily' ? '/d' : viewMode === 'monthly' ? '/mo' : '/yr'
-            amountText = `${fmtUSD(val)} ${suffix}`
-          }
-        }
+              if (typeof val === 'number' && isFinite(val)) {
+                const suffix = viewMode === 'daily' ? '/d' : viewMode === 'monthly' ? '/mo' : '/yr'
+                amountText = `${fmtUSD(val)} ${suffix}`
+              }
+                                    }
 
         const finalLabel =
           amountText && e.label
@@ -460,9 +486,11 @@ export default function FlowPage() {
 
   return (
     <main className="relative w-full text-white">
+      <FlowSwitcher />
+  
       {/* Header with stats and controls */}
       <div className="sticky top-0 z-30 bg-black/50 backdrop-blur supports-[backdrop-filter]:bg-black/30">
-        <div className="mx-auto max-w-6xl px-4 py-4">
+          <div className="mx-auto max-w-6xl px-4 py-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
             {/* Left: title + totals */}
             <div className="min-w-0">
@@ -501,50 +529,58 @@ export default function FlowPage() {
                 <h1 className="truncate text-2xl font-semibold">{flow?.name || '…'}</h1>
               )}
 
-              {(!isPublicViewer || publicMode >= 2) && (
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs">
-                    {fmtUSD(daily)} <span className="text-white/60">/ day</span>
-                  </span>
-                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs">
-                    {fmtUSD(monthly)} <span className="text-white/60">/ mo</span>
-                  </span>
-                  <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs">
-                    {fmtUSD(yearly)} <span className="text-white/60">/ yr</span>
-                  </span>
-                </div>
-              )}
+{(!isPublicViewer || publicMode >= 2) && (
+  <div className="mt-2 flex items-center gap-3">
+    <span className="rounded-md border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium">
+    {viewMode === 'daily'
+  ? `${fmtCurrency(daily, profile?.master_currency || 'USD')} / day`
+  : viewMode === 'monthly'
+  ? `${fmtCurrency(monthly, profile?.master_currency || 'USD')} / mo`
+  : `${fmtCurrency(yearly, profile?.master_currency || 'USD')} / yr`}
+    </span>
+
+    {isOwner && profile && (
+      <select
+        value={profile.master_currency || 'USD'}
+        onChange={async (e) => {
+          const nextCurrency = e.target.value
+          await supabase
+            .from('profiles')
+            .update({ master_currency: nextCurrency })
+            .eq('id', profile.id)
+          // reload profile so UI updates
+          window.location.reload()
+        }}
+        className="rounded-md bg-black/40 border border-white/10 px-2 py-1 text-xs text-white"
+      >
+        <option value="USD">USD</option>
+        <option value="TWD">TWD</option>
+        <option value="CAD">CAD</option>
+        <option value="EUR">EUR</option>
+      </select>
+    )}
+  </div>
+)}
             </div>
 
-            {/* Right: grouped controls */}
-            <div className="flex items-center gap-3 overflow-x-auto flex-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {isOwner && (
-                <>
-                  {/* Group 0: View mode + owner show amounts toggle */}
-                  <div className="flex flex-none items-center gap-1 rounded-md border border-white/15 bg-black/40 p-1">
-                    {(['daily','monthly','yearly'] as ViewMode[]).map(m => (
-                      <button
-                        key={m}
-                        onClick={() => setViewMode(m)}
-                        className={`h-8 px-3 rounded-md text-sm ${
-                          viewMode === m ? 'bg-white/15' : 'hover:bg-white/10'
-                        }`}
-                        title={`Show ${m} values on links`}
-                      >
-                        {m === 'daily' ? 'Daily' : m === 'monthly' ? 'Monthly' : 'Yearly'}
-                      </button>
-                    ))}
-                    <div className="h-6 w-px bg-white/10 mx-1" />
-                    <label className="flex items-center gap-1 text-sm px-2">
-                      <input
-                        type="checkbox"
-                        checked={showAmounts}
-                        onChange={(e) => setShowAmounts(e.target.checked)}
-                        className="accent-white"
-                      />
-                      Show amounts
-                    </label>
-                  </div>
+{/* Right: grouped controls */}
+<div className="flex items-center gap-3 overflow-x-auto flex-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+  {isOwner && (
+    <>
+      {/* Group 0: Timeframe + owner show amounts toggle */}
+      <div className="flex flex-none items-center gap-2 rounded-md border border-white/15 bg-black/40 p-1">
+        <TimeframeSwitcher viewMode={viewMode} setViewMode={setViewMode} />
+        <div className="h-6 w-px bg-white/10" />
+        <label className="flex items-center gap-1 text-sm px-2">
+          <input
+            type="checkbox"
+            checked={showAmounts}
+            onChange={(e) => setShowAmounts(e.target.checked)}
+            className="accent-white"
+          />
+          Show amounts
+        </label>
+      </div>
 
                   {/* Group 1: Visibility */}
                   <div className="flex flex-none items-center gap-1 rounded-md border border-white/15 bg-black/40 p-1">
@@ -663,23 +699,24 @@ export default function FlowPage() {
 
       {/* Canvas */}
       <div className="mx-auto max-w-6xl px-4 py-4">
-        <FlowCanvas
-          flowId={flow?.id || urlParam}
-          nodes={rfNodes}
-          edges={rfEdges}
-          onNodeClick={(rfNode) => {
-            if (!canOpenDetails) return
-            const real = edges.find(n => n.id === rfNode.id) // not used here but kept pattern
-            const actual = nodes.find(n => n.id === rfNode.id)
-            if (actual) setSelectedNode(actual)
-          }}
-          onEdgeClick={(rfEdge) => {
-            if (!canOpenDetails) return
-            const real = edges.find(e => e.id === rfEdge.id)
-            if (real) setSelectedEdge(real)
-          }}
-          refresh={() => (flow?.id ? refreshCanvas(flow.id) : Promise.resolve())}
-        />
+      <FlowCanvas
+  flowId={flow?.id || urlParam}
+  nodes={rfNodes}
+  edges={rfEdges}
+  onNodeClick={(rfNode) => {
+    if (!canOpenDetails) return
+    const real = edges.find(n => n.id === rfNode.id)
+    const actual = nodes.find(n => n.id === rfNode.id)
+    if (actual) setSelectedNode(actual)
+  }}
+  onEdgeClick={(rfEdge) => {
+    if (!canOpenDetails) return
+    const real = edges.find(e => e.id === rfEdge.id)
+    if (real) setSelectedEdge(real)
+  }}
+  refresh={() => (flow?.id ? refreshCanvas(flow.id) : Promise.resolve())}
+  viewMode={viewMode} // ✅ ← ADD THIS LINE
+/>
       </div>
 
       {/* Add Node Modal, owner only */}

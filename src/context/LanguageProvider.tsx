@@ -2,14 +2,14 @@
 
 import { createContext, useContext, useState, ReactNode } from 'react'
 import en from '@/locales/en.json'
-import zhTW from '@/locales/zh-TW.json'
+import zhTW from '@/locales/zh_tw.json'
 
-type Locale = 'en' | 'zh-TW'
+type Locale = 'en' | 'zh_tw'
 type Translations = typeof en
 
 const dictionaries: Record<Locale, Translations> = {
   en,
-  'zh-TW': zhTW,
+  'zh_tw': zhTW,
 }
 
 type LanguageContextType = {

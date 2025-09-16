@@ -17,6 +17,7 @@ type Profile = {
   handle: string | null
   name: string | null
   subscription_level: SubscriptionLevel | null
+  master_currency: string | null   // ✅ add this
   created_at: string
   updated_at: string
 }
@@ -48,8 +49,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase
         .from('profiles')
         .select(
-          'id,email,handle,name,subscription_level,created_at,updated_at'
-        )
+'id,email,handle,name,subscription_level,master_currency,created_at,updated_at'        )
         .eq('id', session.user.id)
         .single()
 

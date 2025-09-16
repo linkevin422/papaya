@@ -17,5 +17,5 @@ DELETE FROM nodes;
 DELETE FROM flows;
 
 
---- to test stripe payment ---
+--- to test stripe payment (separate terminal, change key if need to) ---
 stripe listen --forward-to localhost:3000/api/webhooks/stripe

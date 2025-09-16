@@ -6,14 +6,14 @@ const resend = new Resend(process.env.RESEND_API_KEY!)
 
 export async function POST(req: Request) {
   try {
-    const { email, password, name, handle } = await req.json()
+    const { email, password, name, handle, master_currency } = await req.json()
 
     // 1) Create user (no Supabase email)
     const { data: userData, error: createErr } =
       await supabaseAdmin.auth.admin.createUser({
         email,
         password,
-        user_metadata: { name, handle },
+        user_metadata: { name, handle, master_currency },
         email_confirm: false,
       })
 
@@ -30,9 +30,10 @@ export async function POST(req: Request) {
       .upsert(
         {
           id: user.id,
-          email: user.email ?? email ?? null,
-          name: (user.user_metadata as any)?.name ?? name ?? null,
-          handle: (user.user_metadata as any)?.handle ?? handle ?? null,
+          email: user.email ?? email,
+          name: user.user_metadata?.name ?? name,
+          handle: user.user_metadata?.handle ?? handle,
+          master_currency: user.user_metadata?.master_currency ?? master_currency ?? 'USD',
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'id' }

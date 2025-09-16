@@ -31,6 +31,12 @@
     "email_sent": "已發送驗證信！",
     "check_your_inbox": "請前往信箱確認您的電子郵件。",
     "go_to_email": "前往信箱",
-    "name": "姓名"
+    "name": "姓名",
+    "must_agree_terms": "請同意服務條款與隱私權政策。",
+    "agree_prefix": "我已閱讀並同意",
+    "terms_of_service": "服務條款",
+    "privacy_policy": "隱私權政策",
+    "and": "與",
+    "master_currency": "首選幣別"
   }
   

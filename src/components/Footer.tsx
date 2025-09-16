@@ -16,7 +16,7 @@ export default function Footer() {
         <a href="/legal/contact" className="hover:text-white transition">Contact</a>
       </nav>
       <button
-        onClick={() => setLang(lang === 'en' ? 'zh-TW' : 'en')}
+        onClick={() => setLang(lang === 'en' ? 'zh_tw' : 'en')}
         className="hover:text-white transition"
       >
         {lang === 'en' ? '中文' : 'EN'}

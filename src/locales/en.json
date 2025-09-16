@@ -31,6 +31,12 @@
     "email_sent": "Email sent!",
     "check_your_inbox": "Check your inbox to confirm your email.",
     "go_to_email": "Go to your email",
-    "name": "Name"
+    "name": "Name",
+    "must_agree_terms": "Please agree to the Terms of Service and Privacy Policy.",
+    "agree_prefix": "I have read and agree to the",
+    "terms_of_service": "Terms of Service",
+    "privacy_policy": "Privacy Policy",
+    "and": "and",
+    "master_currency": "Preferred Currency"
   }
   
