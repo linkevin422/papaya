@@ -437,21 +437,21 @@ useEffect(() => {
         // how the edge decides to show amount
         let amountText: string | null = null
         const isIncome = normalizeType(e.type) === 'Income'
-        const hasRecurring = (e.entries_count || 0) >= 2
-
-        if (showAmountsForViewer && isIncome && hasRecurring && e.show_amount !== false) {
+        const shouldShow = e.show_amount !== false && showAmountsForViewer
+        
+        if (shouldShow && isIncome) {
           const val =
             viewMode === 'daily'
               ? e.daily_flow
               : viewMode === 'monthly'
               ? e.monthly_flow
               : e.yearly_flow
-              if (typeof val === 'number' && isFinite(val)) {
-                const suffix = viewMode === 'daily' ? '/d' : viewMode === 'monthly' ? '/mo' : '/yr'
-                amountText = `${fmtUSD(val)} ${suffix}`
-              }
-                                    }
-
+          if (typeof val === 'number' && isFinite(val)) {
+            const suffix = viewMode === 'daily' ? '/d' : viewMode === 'monthly' ? '/mo' : '/yr'
+            amountText = `${fmtUSD(val)} ${suffix}`
+          }
+        }
+        
         const finalLabel =
           amountText && e.label
             ? `${e.label} • ${amountText}`

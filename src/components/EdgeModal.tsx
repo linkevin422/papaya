@@ -11,7 +11,7 @@ import { Dialog } from '@headlessui/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { createClient } from '@/lib/supabase'
-import { Trash2, PlusCircle } from 'lucide-react'
+import { Trash2, PlusCircle, AlertTriangle } from 'lucide-react'
 
 type Props = {
   open: boolean
@@ -78,6 +78,10 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [sortAsc, setSortAsc] = useState(false)
   const [filterText, setFilterText] = useState('')
+
+  // confirmations
+  const [confirmingDeleteEdge, setConfirmingDeleteEdge] = useState(false)
+  const [confirmingSwitchType, setConfirmingSwitchType] = useState<null | 'Income' | 'Traffic'>(null)
 
   const [recurring, setRecurring] = useState<EdgeRecurring | null>(null)
 
@@ -151,50 +155,70 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
     }
   }, [open, edge, loadEntries, loadRecurring])
 
-  // ✅ fixed addEntry with RPC
+  // add entry (RPC does conversion)
   const addEntry = async () => {
     if (type === 'Traffic') return
-  
+
     const normalized = newAmount.replace(/,/g, '.').replace(/[^\d.]/g, '')
     const amt = Number(normalized)
     if (!newDate || !normalized || Number.isNaN(amt)) return
-  
+
     const { data: userData, error: userErr } = await supabase.auth.getUser()
-    if (userErr) {
-      console.error('Auth error', userErr)
-      return
-    }
+    if (userErr) return
     const userId = userData.user?.id
-    if (!userId) {
-      console.error('No user ID found')
-      return
-    }
-  
+    if (!userId) return
+
     const { error } = await supabase.rpc('add_edge_entry', {
       p_user_id: userId,
-      p_edge_id: String(edge.id), // 👈 force to text
+      p_edge_id: String(edge.id),
       p_entry_date: newDate,
       p_original_amount: amt,
       p_original_currency: newCurrency,
       p_note: newNote.trim() || null,
     })
-  
-    if (error) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('RPC error', error)
-      }
-      return
-    }
-        
+    if (error) return
+
     setNewAmount('')
     setNewNote('')
     await loadEntries()
     await loadRecurring()
     await refresh()
   }
-    
+
   const deleteEntry = async (id: string) => {
     await supabase.from('edge_entries').delete().eq('id', id)
+    await loadEntries()
+    await loadRecurring()
+    await refresh()
+  }
+
+  const bulkDeleteEntries = async () => {
+    if (selectedIds.size === 0) return
+    await supabase.from('edge_entries').delete().in('id', Array.from(selectedIds))
+    setSelectedIds(new Set())
+    await loadEntries()
+    await loadRecurring()
+    await refresh()
+  }
+
+  // destructive edge ops (anon client assumes RLS grants owner delete; works same as your other deletes)
+  const actuallyDeleteEdge = async () => {
+    // delete entries then the edge
+    await supabase.from('edge_entries').delete().eq('edge_id', edge.id)
+    await supabase.from('edges').delete().eq('id', edge.id)
+    setConfirmingDeleteEdge(false)
+    onClose()
+    await refresh()
+  }
+
+  const performSwitchType = async (nextType: 'Income' | 'Traffic') => {
+    // if switching to Traffic, entries are wiped
+    if (nextType === 'Traffic') {
+      await supabase.from('edge_entries').delete().eq('edge_id', edge.id)
+    }
+    await supabase.from('edges').update({ type: nextType }).eq('id', edge.id)
+    setType(nextType)
+    setConfirmingSwitchType(null)
     await loadEntries()
     await loadRecurring()
     await refresh()
@@ -215,6 +239,9 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
     return sorted
   }, [entries, sortAsc, filterText])
 
+  const allOnPageIds = useMemo(() => sortedFiltered.map(e => e.id), [sortedFiltered])
+  const allSelectedOnPage = allOnPageIds.length > 0 && allOnPageIds.every(id => selectedIds.has(id))
+
   return (
     <Dialog open={open} onClose={onClose} className="fixed inset-0 z-50">
       <div className="fixed inset-0 bg-black/70" />
@@ -232,19 +259,77 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
                 <span className="font-medium">{bName}</span>
               </div>
             </div>
+
+            {/* Quick actions: type select + dangerous ops */}
+            <div className="flex items-center gap-2">
+              <select
+                value={type}
+                onChange={(e) => {
+                  const next = e.target.value as 'Income' | 'Traffic' | 'Fuel'
+                  if (next === type) return
+                  if (next === 'Fuel') {
+                    // For now, disallow Fuel switch silently (or implement later)
+                    setType(type)
+                    return
+                  }
+                  // Income <-> Traffic requires confirm
+                  setConfirmingSwitchType(next as 'Income' | 'Traffic')
+                }}
+                className="h-9 rounded-md bg-black/40 border border-white/15 px-2 text-sm"
+                title="Switch type"
+              >
+                <option value="Income">Income</option>
+                <option value="Traffic">Traffic</option>
+                <option value="Fuel" disabled>Fuel</option>
+              </select>
+
+              <button
+                onClick={() => setConfirmingDeleteEdge(true)}
+                className="h-9 rounded-md border border-red-500/30 px-3 text-sm text-red-300 hover:bg-red-500/10"
+                title="Delete link and all its data"
+              >
+                Delete Link
+              </button>
+            </div>
           </div>
 
           {/* Body */}
           <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+            {/* Top meta row */}
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge>Type: {type}</Badge>
+              <Badge>Direction: {dir}</Badge>
+              <Badge>Entries: {entries.length}</Badge>
+              {typeof recurring?.monthly_flow === 'number' && (
+                <Badge>~ {recurring?.monthly_flow?.toFixed(2)} / mo</Badge>
+              )}
+              {type !== 'Traffic' && (
+                <label className="ml-auto inline-flex items-center gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={showAmount}
+                    onChange={async (e) => {
+                      setShowAmount(e.target.checked)
+                      await supabase.from('edges').update({ show_amount: e.target.checked }).eq('id', edge.id)
+                      await refresh()
+                    }}
+                    className="accent-white"
+                  />
+                  Show amount on edge
+                </label>
+              )}
+            </div>
+
+            {/* TYPE == Traffic notice */}
             {type === 'Traffic' ? (
               <div className="rounded-lg border border-white/10 bg-white/5 p-4">
                 <div className="text-sm text-white/80">
-                  This link is marked as Traffic. It carries no money entries.
+                  This link is marked as <span className="font-semibold">Traffic</span>. It carries no money entries.
                 </div>
               </div>
             ) : (
               <div className="space-y-4">
-                {/* add row */}
+                {/* Add entry row */}
                 <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr_1fr_auto] gap-2">
                   <Input
                     type="date"
@@ -293,7 +378,51 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
                   </button>
                 </div>
 
-                {/* list */}
+                {/* Entries toolbar */}
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-white/10 bg-black/30 p-2">
+                  <div className="flex items-center gap-3">
+                    <label className="inline-flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={allSelectedOnPage}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedIds(new Set(allOnPageIds))
+                          } else {
+                            const next = new Set(selectedIds)
+                            allOnPageIds.forEach(id => next.delete(id))
+                            setSelectedIds(next)
+                          }
+                        }}
+                      />
+                      Select all on page
+                    </label>
+
+                    {selectedIds.size > 0 && (
+                      <Button onClick={bulkDeleteEntries} className="bg-red-600 hover:bg-red-700 text-white h-8 px-3 text-xs">
+                        Delete {selectedIds.size} selected
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder="Filter notes…"
+                      value={filterText}
+                      onChange={(e) => setFilterText(e.target.value)}
+                      className="h-8 w-40"
+                    />
+                    <button
+                      onClick={() => setSortAsc(s => !s)}
+                      className="h-8 rounded-md border border-white/15 px-3 text-xs hover:bg-white/10"
+                      title="Toggle sort"
+                    >
+                      {sortAsc ? 'Oldest first' : 'Newest first'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Entries list */}
                 <div className="divide-y divide-white/5">
                   {loadingEntries ? (
                     <div className="p-4 text-sm text-white/70">Loading entries...</div>
@@ -305,10 +434,22 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
                         key={en.id}
                         className="px-3 py-3 flex items-center justify-between hover:bg-white/[0.03]"
                       >
-                        <div className="text-sm">
-                          <div className="font-medium">{en.entry_date}</div>
-                          <div className="text-white/70">
-                            {en.note || <span className="italic text-white/50">No note</span>}
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(en.id)}
+                            onChange={(e) => {
+                              const next = new Set(selectedIds)
+                              if (e.target.checked) next.add(en.id)
+                              else next.delete(en.id)
+                              setSelectedIds(next)
+                            }}
+                          />
+                          <div className="text-sm">
+                            <div className="font-medium">{en.entry_date}</div>
+                            <div className="text-white/70">
+                              {en.note || <span className="italic text-white/50">No note</span>}
+                            </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
@@ -332,10 +473,68 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
                 </div>
               </div>
             )}
+
+            {/* Confirm switch type */}
+            {confirmingSwitchType && (
+              <div className="rounded-lg border border-amber-400/30 bg-amber-900/30 p-4 text-amber-100">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 flex-none" />
+                  <div>
+                    <p className="font-semibold">Switch link type to {confirmingSwitchType}?</p>
+                    <p className="mt-1 text-sm">
+                      Switching between Income and Traffic will change how this link behaves.
+                      {confirmingSwitchType === 'Traffic' && ' Moving to Traffic will delete all existing entries on this link.'}
+                    </p>
+                    <div className="mt-3 flex gap-2">
+                      <Button
+                        onClick={() => performSwitchType(confirmingSwitchType)}
+                        className="bg-amber-600 hover:bg-amber-700 text-white"
+                      >
+                        Confirm switch
+                      </Button>
+                      <Button onClick={() => setConfirmingSwitchType(null)} className="border border-white/15 bg-transparent">
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Confirm delete edge */}
+            {confirmingDeleteEdge && (
+              <div className="rounded-lg border border-red-500/30 bg-red-900/30 p-4 text-red-100">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 flex-none" />
+                  <div>
+                    <p className="font-semibold">Delete this link?</p>
+                    <p className="mt-1 text-sm">
+                      This will permanently delete {entries.length} entr{entries.length === 1 ? 'y' : 'ies'} attached to this link and the link itself.
+                    </p>
+                    <div className="mt-3 flex gap-2">
+                      <Button onClick={actuallyDeleteEdge} className="bg-red-700 hover:bg-red-800 text-white">
+                        Confirm delete
+                      </Button>
+                      <Button onClick={() => setConfirmingDeleteEdge(false)} className="border border-white/15 bg-transparent">
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Footer */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-6 border-t border-white/10">
+            <div className="flex items-center gap-2 text-xs text-white/60">
+              {type !== 'Traffic' ? (
+                <span>Master currency: <span className="font-semibold text-white">{masterCurrency}</span></span>
+              ) : (
+                <span>Traffic link, no monetary entries.</span>
+              )}
+            </div>
+
             <button
               onClick={onClose}
               className="bg-transparent text-white hover:text-gray-300 px-4 py-2 rounded-md border border-white/10"

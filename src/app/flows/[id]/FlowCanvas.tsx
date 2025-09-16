@@ -60,10 +60,37 @@ export default function FlowCanvas({
   const onConnect: OnConnect = useCallback(
     async (connection: Connection) => {
       if (!connection.source || !connection.target) return
-
+  
+      // 1. Check in local edges
+      const alreadyExists = edgesState.some(
+        (e) =>
+          e.source === connection.source &&
+          e.target === connection.target &&
+          e.data?.linkType === 'Traffic' // optional type check
+      )
+      if (alreadyExists) {
+        console.log('Edge already exists locally, skipping insert.')
+        return
+      }
+  
+      // 2. Check in DB
+      const { data: existing } = await supabase
+        .from('edges')
+        .select('id')
+        .eq('flow_id', flowId)
+        .eq('source_id', connection.source)
+        .eq('target_id', connection.target)
+        .maybeSingle()
+  
+      if (existing) {
+        console.log('Edge already exists in DB, skipping insert:', existing.id)
+        return
+      }
+  
+      // 3. Otherwise create
       const type = 'Traffic'
       const stroke = EDGE_COLOR[type] || '#e5e7eb'
-
+  
       const newEdge: Edge = {
         id: `${connection.source}-${connection.target}-${Date.now()}`,
         source: connection.source,
@@ -74,9 +101,9 @@ export default function FlowCanvas({
         style: { stroke, strokeWidth: 2 },
         data: { direction: 'a->b', linkType: type },
       }
-
+  
       setEdgesState((eds) => addEdge(newEdge, eds))
-
+  
       await supabase.from('edges').insert({
         id: newEdge.id,
         flow_id: flowId,
@@ -87,12 +114,12 @@ export default function FlowCanvas({
         label: null,
         show_amount: true,
       })
-
+  
       refresh()
     },
-    [flowId, setEdgesState, refresh]
+    [flowId, setEdgesState, refresh, edgesState]
   )
-
+    
   const onNodeDragStop = useCallback(
     async (_e: any, node: Node) => {
       await supabase
@@ -140,11 +167,6 @@ export default function FlowCanvas({
 
   return (
     <div className="relative h-[80vh] w-full">
-
-<div className="absolute left-3 top-3 z-10 text-white/50 text-sm" data-export-ignore="true">
-  View: <span className="font-mono text-white">{viewMode}</span>
-</div>
-
       
       {/* Tiny export menu (ignored in exports) */}
 {/* Tiny export menu (ignored in exports) */}
