@@ -25,7 +25,7 @@ const supabase = createClient()
 const EDGE_COLOR: Record<string, string> = {
   Income: '#22c55e',
   Traffic: '#60a5fa',
-  Fuel: '#f97316',
+  Fuel: '#ef4444', // bright red
 }
 
 type Props = {
@@ -61,66 +61,45 @@ export default function FlowCanvas({
     async (connection: Connection) => {
       if (!connection.source || !connection.target) return
   
-      // 1. Check in local edges
-      const alreadyExists = edgesState.some(
-        (e) =>
-          e.source === connection.source &&
-          e.target === connection.target &&
-          e.data?.linkType === 'Traffic' // optional type check
-      )
-      if (alreadyExists) {
-        console.log('Edge already exists locally, skipping insert.')
-        return
-      }
+      const newId = `${connection.source}-${connection.target}-${Date.now()}`
+      const type = 'Traffic' // <- MUST match DB constraint exactly (capital T)
+      const strokeColor = EDGE_COLOR.Traffic || '#e5e7eb'
   
-      // 2. Check in DB
-      const { data: existing } = await supabase
-        .from('edges')
-        .select('id')
-        .eq('flow_id', flowId)
-        .eq('source_id', connection.source)
-        .eq('target_id', connection.target)
-        .maybeSingle()
-  
-      if (existing) {
-        console.log('Edge already exists in DB, skipping insert:', existing.id)
-        return
-      }
-  
-      // 3. Otherwise create
-      const type = 'Traffic'
-      const stroke = EDGE_COLOR[type] || '#e5e7eb'
-  
+      // optimistic edge
       const newEdge: Edge = {
-        id: `${connection.source}-${connection.target}-${Date.now()}`,
+        id: newId,
         source: connection.source,
         target: connection.target,
-        label: undefined,
-        markerEnd: { type: MarkerType.ArrowClosed, color: stroke },
+        markerEnd: { type: MarkerType.ArrowClosed, color: strokeColor },
         animated: true,
-        style: { stroke, strokeWidth: 2 },
+        style: { stroke: strokeColor, strokeWidth: 2 },
         data: { direction: 'a->b', linkType: type },
       }
+      setEdgesState(eds => addEdge(newEdge, eds))
   
-      setEdgesState((eds) => addEdge(newEdge, eds))
-  
-      await supabase.from('edges').insert({
-        id: newEdge.id,
+      // insert (include id because edges.id is NOT NULL)
+      const { error } = await supabase.from('edges').insert({
+        id: newId,
         flow_id: flowId,
         source_id: connection.source,
         target_id: connection.target,
-        type,
+        type,                // 'Traffic' with capital T
         direction: 'a->b',
         label: null,
         show_amount: true,
       })
   
-      refresh()
+      if (error) {
+        console.error('Edge insert failed:', error)
+        setEdgesState(eds => eds.filter(e => e.id !== newId)) // rollback
+        return
+      }
+  
+      await refresh()
     },
-    [flowId, setEdgesState, refresh, edgesState]
+    [flowId, setEdgesState, refresh]
   )
-    
-  const onNodeDragStop = useCallback(
+      const onNodeDragStop = useCallback(
     async (_e: any, node: Node) => {
       await supabase
         .from('nodes')

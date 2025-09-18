@@ -81,7 +81,7 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
 
   // confirmations
   const [confirmingDeleteEdge, setConfirmingDeleteEdge] = useState(false)
-  const [confirmingSwitchType, setConfirmingSwitchType] = useState<null | 'Income' | 'Traffic'>(null)
+  const [confirmingSwitchType, setConfirmingSwitchType] = useState<null | 'Income' | 'Traffic' | 'Fuel'>(null)
 
   const [recurring, setRecurring] = useState<EdgeRecurring | null>(null)
 
@@ -158,33 +158,39 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
   // add entry (RPC does conversion)
   const addEntry = async () => {
     if (type === 'Traffic') return
-
-    const normalized = newAmount.replace(/,/g, '.').replace(/[^\d.]/g, '')
-    const amt = Number(normalized)
-    if (!newDate || !normalized || Number.isNaN(amt)) return
-
+  
+    // Take only the left side before "≈", if present
+    let amtStr = newAmount.split('≈')[0].trim()
+    // Strip currency symbols/letters, keep digits and dot
+    amtStr = amtStr.replace(/[A-Za-z$€£¥₩]/g, '').trim()
+    // Normalize commas to dot
+    amtStr = amtStr.replace(/,/g, '.').replace(/[^\d.]/g, '')
+  
+    const amt = Number(amtStr)
+    if (!newDate || !amtStr || Number.isNaN(amt)) return
+  
     const { data: userData, error: userErr } = await supabase.auth.getUser()
     if (userErr) return
     const userId = userData.user?.id
     if (!userId) return
-
+  
     const { error } = await supabase.rpc('add_edge_entry', {
       p_user_id: userId,
       p_edge_id: String(edge.id),
       p_entry_date: newDate,
-      p_original_amount: amt,
+      p_original_amount: amt,         // always just the numeric input
       p_original_currency: newCurrency,
       p_note: newNote.trim() || null,
     })
     if (error) return
-
+  
     setNewAmount('')
     setNewNote('')
     await loadEntries()
     await loadRecurring()
     await refresh()
   }
-
+    
   const deleteEntry = async (id: string) => {
     await supabase.from('edge_entries').delete().eq('id', id)
     await loadEntries()
@@ -211,21 +217,54 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
     await refresh()
   }
 
-  const performSwitchType = async (nextType: 'Income' | 'Traffic') => {
+  const performSwitchType = async (nextType: 'Income' | 'Traffic' | 'Fuel') => {
     // if switching to Traffic, entries are wiped
     if (nextType === 'Traffic') {
       await supabase.from('edge_entries').delete().eq('edge_id', edge.id)
     }
-    await supabase.from('edges').update({ type: nextType }).eq('id', edge.id)
+  
+    const { error } = await supabase
+      .from('edges')
+      .update({ type: nextType })
+      .eq('id', edge.id)
+  
+    if (error) {
+      console.error('Failed to switch type:', error)
+      return
+    }
+  
     setType(nextType)
     setConfirmingSwitchType(null)
     await loadEntries()
     await loadRecurring()
     await refresh()
   }
-
+    
   const fmtMoney = (n: number | null | undefined, cur?: string) =>
     typeof n === 'number' ? `${cur || ''} ${n.toFixed(2)}` : 'N/A'
+
+  const fxRateMap: Record<string, number> = {
+    TWD: 34.5,
+    USD: 1,
+    EUR: 0.85,
+    JPY: 145,
+    CAD: 1.38,
+    GBP: 0.74,
+  }
+  
+  const convertUSD = (usd: number | null | undefined, to: string) =>
+    typeof usd === 'number' ? usd * (fxRateMap[to] ?? 1) : null
+  
+  const formatCurrency = (amt: number | null | undefined, cur: string) =>
+    typeof amt === 'number'
+      ? new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: cur,
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }).format(amt)
+      : 'N/A'
+  
 
   const sortedFiltered = useMemo(() => {
     const filtered = filterText
@@ -262,26 +301,21 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
 
             {/* Quick actions: type select + dangerous ops */}
             <div className="flex items-center gap-2">
-              <select
-                value={type}
-                onChange={(e) => {
-                  const next = e.target.value as 'Income' | 'Traffic' | 'Fuel'
-                  if (next === type) return
-                  if (next === 'Fuel') {
-                    // For now, disallow Fuel switch silently (or implement later)
-                    setType(type)
-                    return
-                  }
-                  // Income <-> Traffic requires confirm
-                  setConfirmingSwitchType(next as 'Income' | 'Traffic')
-                }}
-                className="h-9 rounded-md bg-black/40 border border-white/15 px-2 text-sm"
-                title="Switch type"
-              >
-                <option value="Income">Income</option>
-                <option value="Traffic">Traffic</option>
-                <option value="Fuel" disabled>Fuel</option>
-              </select>
+            <select
+  value={type}
+  onChange={(e) => {
+    const next = e.target.value as 'Income' | 'Traffic' | 'Fuel'
+    if (next === type) return
+    // Income <-> Traffic requires confirm
+    setConfirmingSwitchType(next as 'Income' | 'Traffic' | 'Fuel')
+  }}
+  className="h-9 rounded-md bg-black/40 border border-white/15 px-2 text-sm"
+  title="Switch type"
+>
+  <option value="Income">Income</option>
+  <option value="Traffic">Traffic</option>
+  <option value="Fuel">Fuel</option>
+</select>
 
               <button
                 onClick={() => setConfirmingDeleteEdge(true)}
@@ -301,8 +335,10 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
               <Badge>Direction: {dir}</Badge>
               <Badge>Entries: {entries.length}</Badge>
               {typeof recurring?.monthly_flow === 'number' && (
-                <Badge>~ {recurring?.monthly_flow?.toFixed(2)} / mo</Badge>
-              )}
+  <Badge>
+    ~ {formatCurrency(convertUSD(recurring.monthly_flow, masterCurrency), masterCurrency)} / mo
+  </Badge>
+)}
               {type !== 'Traffic' && (
                 <label className="ml-auto inline-flex items-center gap-2 text-xs">
                   <input
@@ -453,12 +489,18 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
-                          <div className="font-semibold">
-                            {fmtMoney(en.original_amount ?? en.amount, en.original_currency)}
-                            {en.original_currency !== masterCurrency && en.converted_amount
-                              ? ` ≈ ${fmtMoney(en.converted_amount, masterCurrency)}`
-                              : ''}
-                          </div>
+                        <div className="font-semibold">
+  {type === 'Fuel'
+    ? `-${fmtMoney(en.original_amount ?? en.amount, en.original_currency)}`
+    : fmtMoney(en.original_amount ?? en.amount, en.original_currency)}
+  {en.original_currency !== masterCurrency && en.converted_amount
+    ? ` ≈ ${
+        type === 'Fuel'
+          ? `-${fmtMoney(en.converted_amount, masterCurrency)}`
+          : fmtMoney(en.converted_amount, masterCurrency)
+      }`
+    : ''}
+</div>
                           <button
                             onClick={() => deleteEntry(en.id)}
                             className="inline-flex items-center gap-1 text-red-400 hover:text-red-300 text-sm"
