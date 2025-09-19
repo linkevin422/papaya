@@ -37,6 +37,10 @@
     "terms_of_service": "Terms of Service",
     "privacy_policy": "Privacy Policy",
     "and": "and",
-    "master_currency": "Preferred Currency"
-  }
+    "master_currency": "Preferred Currency",
+    "forgot_password": "Forgot your password?",
+    "send_reset_link": "Send reset link",
+    "sending": "Sending",
+    "reset_link_sent": "Check your email for a reset link"
+    }
   

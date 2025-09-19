@@ -57,15 +57,25 @@ export default function LoginPage() {
           required
         />
 
-        {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+{error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full py-3 bg-white text-black font-semibold rounded hover:bg-gray-200 transition"
-        >
-          {loading ? `${t('login')}…` : t('login')}
-        </button>
+<div className="flex justify-end mb-4">
+  <button
+    type="button"
+    onClick={() => router.push('/forgot-password')}
+    className="text-sm text-blue-400 hover:underline"
+  >
+    {t('forgot_password')}
+  </button>
+</div>
+
+<button
+  type="submit"
+  disabled={loading}
+  className="w-full py-3 bg-white text-black font-semibold rounded hover:bg-gray-200 transition"
+>
+  {loading ? `${t('login')}…` : t('login')}
+</button>
       </form>
     </div>
   )

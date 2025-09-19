@@ -37,6 +37,8 @@
     "terms_of_service": "服務條款",
     "privacy_policy": "隱私權政策",
     "and": "與",
-    "master_currency": "首選幣別"
+    "master_currency": "首選幣別",
+    "forgot_password": "忘記密碼？",
+    "reset_link_sent": "請至信箱收取重設連結"
   }
   
