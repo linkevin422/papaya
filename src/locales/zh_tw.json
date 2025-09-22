@@ -39,6 +39,8 @@
     "and": "與",
     "master_currency": "首選幣別",
     "forgot_password": "忘記密碼？",
-    "reset_link_sent": "請至信箱收取重設連結"
+    "reset_link_sent": "請至信箱收取重設連結",
+    "send_reset_link": "發送重設連結",
+"sending": "發送中…"
   }
   

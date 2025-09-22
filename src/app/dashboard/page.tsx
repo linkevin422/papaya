@@ -28,14 +28,12 @@ export default function DashboardPage() {
       setLoading(true)
       setError(null)
 
-      // ensure user is logged in
       const { data: sessionData } = await supabase.auth.getSession()
       if (!sessionData.session) {
         router.replace('/login')
         return
       }
 
-      // fetch flows for this user
       const { data, error } = await supabase
         .from('flows')
         .select('id, name, created_at, privacy, public_mode')
@@ -54,71 +52,51 @@ export default function DashboardPage() {
     load()
   }, [supabase, router])
 
-  // determine if user can create a new flow
   const canCreateFlow = () => {
     if (!profile) return false
-    if (profile.subscription_level === 'basic') {
-      return flows.length === 0
-    }
-    if (profile.subscription_level === 'pro') {
-      return flows.length < 10
-    }
+    if (profile.subscription_level === 'basic') return flows.length === 0
+    if (profile.subscription_level === 'pro') return flows.length < 10
     return false
   }
 
   return (
     <div className="space-y-6">
-<section className="rounded-2xl border border-neutral-800 p-4">
-  <h2 className="text-lg font-semibold mb-1">Welcome back</h2>
-  <p className="text-sm text-neutral-400">
-    Here's your dashboard. Start with the checklist below to get set up.
-  </p>
-
-  {profile?.master_currency && (
-    <p className="mt-2 text-xs text-neutral-500">
-      Displaying values in: <span className="font-semibold text-white">{profile.master_currency}</span>
-    </p>
-  )}
-</section>
-
-      <section className="rounded-2xl border border-neutral-800 p-4">
-        <h3 className="text-base font-medium mb-1">📋 Onboarding Checklist</h3>
-        <ul className="list-disc list-inside text-sm text-neutral-400 space-y-1">
-          <li>Set your handle</li>
-          <li>Choose your language</li>
-          <li>Connect Stripe (coming soon)</li>
-        </ul>
-      </section>
-
       {/* Flows */}
-      <section className="rounded-2xl border border-neutral-800 p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-base font-medium">🗺️ Your Flows</h3>
+      <section>
+      <div className="mb-3 flex items-center justify-between">
+  <div className="flex items-center gap-3">
+    <h2 className="text-base font-medium text-neutral-200">Your Flows</h2>
+    {profile?.master_currency && (
+      <span className="rounded-full border border-neutral-800 px-2.5 py-0.5 text-xs text-neutral-400">
+        {profile.master_currency}
+      </span>
+    )}
+  </div>
 
-          {!loading && (
-            canCreateFlow() ? (
-              <Link
-                href="/flows/new"
-                className="rounded-lg border border-neutral-700 px-3 py-1.5 text-sm hover:bg-neutral-900"
-              >
-                New Flow
-              </Link>
-            ) : (
-              <button
-                disabled
-                className="rounded-lg border border-neutral-800 px-3 py-1.5 text-sm text-neutral-600 cursor-not-allowed"
-              >
-                New Flow (Upgrade to unlock)
-              </button>
-            )
-          )}
-        </div>
+  {/* Action button */}
+  {!loading && (
+    canCreateFlow() ? (
+      <Link
+        href="/flows/new"
+        className="rounded-xl bg-white/5 px-3 py-1.5 text-sm hover:bg-white/10 border border-neutral-700"
+      >
+        New Flow
+      </Link>
+    ) : (
+      <Link
+        href="/pricing"
+        className="rounded-xl border border-amber-500/40 text-amber-400 px-3 py-1.5 text-sm hover:bg-amber-500/10"
+      >
+        Upgrade for more flows
+      </Link>
+    )
+  )}
+</div>
 
         {loading && (
-          <div className="space-y-2">
-            <div className="h-10 rounded-lg bg-neutral-900/70 animate-pulse" />
-            <div className="h-10 rounded-lg bg-neutral-900/70 animate-pulse" />
-            <div className="h-10 rounded-lg bg-neutral-900/70 animate-pulse" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="h-20 rounded-2xl bg-neutral-900/70 animate-pulse" />
+            <div className="h-20 rounded-2xl bg-neutral-900/70 animate-pulse" />
           </div>
         )}
 
@@ -127,55 +105,58 @@ export default function DashboardPage() {
         )}
 
         {!loading && !error && flows.length === 0 && (
-          <div className="rounded-lg border border-neutral-800 p-4 text-sm text-neutral-400">
-            You don't have any flows yet.
-            {canCreateFlow() && (
-              <Link href="/flows/new" className="ml-2 underline hover:no-underline">
+          <div className="rounded-2xl border border-neutral-800 p-8 text-center">
+            <p className="text-sm text-neutral-400">No flows yet.</p>
+            {canCreateFlow() ? (
+              <Link
+                href="/flows/new"
+                className="mt-3 inline-block rounded-xl bg-white/5 px-3 py-1.5 text-sm hover:bg-white/10 border border-neutral-700"
+              >
                 Create your first flow
+              </Link>
+            ) : (
+              <Link
+                href="/pricing"
+                className="mt-3 inline-block rounded-xl border border-neutral-800 px-3 py-1.5 text-sm text-neutral-300 hover:bg-neutral-900"
+              >
+                See plans
               </Link>
             )}
           </div>
         )}
 
         {!loading && !error && flows.length > 0 && (
-          <ul className="divide-y divide-neutral-800 rounded-lg border border-neutral-800">
+          <ul className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {flows.map((f) => (
-              <li key={f.id} className="group">
+              <li key={f.id}>
                 <Link
                   href={`/flows/${f.id}`}
-                  className="flex items-center justify-between px-4 py-3 hover:bg-neutral-900"
+                  className="group block rounded-2xl border border-neutral-800 p-4 hover:bg-neutral-900 transition"
                 >
-                  <div className="min-w-0">
+                  <div className="flex items-center justify-between">
                     <p className="truncate text-sm font-medium">
                       {f.name || 'Untitled Flow'}
                     </p>
-                    <p className="mt-0.5 text-xs text-neutral-400">
-                      {new Date(f.created_at).toLocaleString()}
-                      <span className="mx-2">•</span>
-                      {f.privacy === 'public' ? 'Public' : 'Private'}
-                    </p>
+                    <svg
+                      className="h-4 w-4 shrink-0 opacity-50 transition group-hover:translate-x-0.5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
                   </div>
-                  <svg
-                    className="h-4 w-4 shrink-0 opacity-60 transition group-hover:translate-x-0.5"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                  </svg>
+                  <p className="mt-2 text-[11px] text-neutral-500">
+                    {new Date(f.created_at).toLocaleString()}
+                    <span className="mx-2">•</span>
+                    {f.privacy === 'public' ? 'Public' : 'Private'}
+                  </p>
                 </Link>
               </li>
             ))}
           </ul>
         )}
-      </section>
-
-      <section className="rounded-2xl border border-neutral-800 p-4">
-        <h3 className="text-base font-medium mb-1">🧩 Your First Widget</h3>
-        <p className="text-sm text-neutral-400">
-          Drop in something useful here, maybe analytics, a graph, a shortcut.
-        </p>
       </section>
     </div>
   )

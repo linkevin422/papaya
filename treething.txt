@@ -19,3 +19,17 @@ DELETE FROM flows;
 
 --- to test stripe payment (separate terminal, change key if need to) ---
 stripe listen --forward-to localhost:3000/api/webhooks/stripe
+
+
+
+----solution prompt-----
+
+We work one step at a time, no skipping ahead.
+
+At each step, you show me the exact SQL or code to run.
+
+I will paste back the raw output, and you validate it.
+
+We only move forward once the current step is fully correct.
+
+The goal is to trace the bug layer by layer (data → view → totals → UI), isolating where it goes wrong and fixing it there.

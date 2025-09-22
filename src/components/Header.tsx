@@ -56,36 +56,30 @@ export default function Header() {
   return (
     <header className="fixed top-0 left-0 right-0 z-20 border-b border-neutral-800 bg-black/80 backdrop-blur-sm">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
-        {/* Logo + Primary nav */}
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="font-semibold">
-              Papaya
-            </Link>
-            <Link
-              href="/about"
-              className="text-sm opacity-80 hover:opacity-100"
-            >
-              About
-            </Link>
-          </div>
+        {/* Left: Logo */}
+        <Link href="/" className="font-semibold">
+          Papaya
+        </Link>
 
+        {/* Center: Navigation */}
+        <nav className="flex items-center gap-6">
+          <Link href="/about" className="text-sm opacity-80 hover:opacity-100">
+            About
+          </Link>
           <Link
-            href={profile ? (firstFlowId ? `/flows/${firstFlowId}` : '/flows') : '/login'}
+            href={
+              profile ? (firstFlowId ? `/flows/${firstFlowId}` : '/flows') : '/login'
+            }
             className="text-sm opacity-80 hover:opacity-100"
           >
             My Flow
           </Link>
-
-          <Link
-            href="/pricing"
-            className="text-sm opacity-80 hover:opacity-100"
-          >
+          <Link href="/pricing" className="text-sm opacity-80 hover:opacity-100">
             Pricing
           </Link>
-        </div>
+        </nav>
 
-        {/* Right side */}
+        {/* Right: User / Auth controls */}
         {profile ? (
           <div className="relative" ref={menuRef}>
             <button
@@ -111,7 +105,9 @@ export default function Header() {
             {menuOpen && (
               <div className="absolute right-0 mt-2 w-52 overflow-hidden rounded-lg border border-neutral-800 bg-neutral-950 shadow-xl">
                 <div className="px-4 py-2 text-sm text-neutral-400 border-b border-neutral-800">
-                  {profile.subscription_level === 'pro' ? 'Pro User' : 'Basic User'}
+                  {profile.subscription_level === 'pro'
+                    ? 'Pro User'
+                    : 'Basic User'}
                 </div>
 
                 <Link
@@ -123,7 +119,9 @@ export default function Header() {
                 </Link>
 
                 <Link
-                  href={profile ? (firstFlowId ? `/flows/${firstFlowId}` : '/flows') : '/login'}
+                  href={
+                    profile ? (firstFlowId ? `/flows/${firstFlowId}` : '/flows') : '/login'
+                  }
                   className="block px-4 py-2 text-sm hover:bg-neutral-900"
                   onClick={() => setMenuOpen(false)}
                 >
@@ -141,10 +139,7 @@ export default function Header() {
           </div>
         ) : (
           <div className="flex items-center gap-4">
-            <Link
-              href="/login"
-              className="text-sm opacity-80 hover:opacity-100"
-            >
+            <Link href="/login" className="text-sm opacity-80 hover:opacity-100">
               {t('login')}
             </Link>
             <Link
