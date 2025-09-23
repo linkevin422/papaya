@@ -293,10 +293,10 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
                 Edit Link
               </Dialog.Title>
               <div className="text-sm text-white/70 truncate">
-                <span className="font-medium">{aName}</span>
-                <span className="mx-2 text-white/50">↔</span>
-                <span className="font-medium">{bName}</span>
-              </div>
+  <span className="font-medium">{aName}</span>
+  <span className="mx-2 text-white/50">→</span>
+  <span className="font-medium">{bName}</span>
+</div>
             </div>
 
             {/* Quick actions: type select + dangerous ops */}
@@ -329,32 +329,27 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
 
           {/* Body */}
           <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
-            {/* Top meta row */}
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge>Type: {type}</Badge>
-              <Badge>Direction: {dir}</Badge>
-              <Badge>Entries: {entries.length}</Badge>
-              {typeof recurring?.monthly_flow === 'number' && (
-  <Badge>
-    ~ {formatCurrency(convertUSD(recurring.monthly_flow, masterCurrency), masterCurrency)} / mo
-  </Badge>
+{/* Top meta row */}
+{type !== 'Traffic' && (
+  <div className="flex flex-wrap items-center gap-2">
+    <label className="ml-auto inline-flex items-center gap-2 text-xs">
+      <input
+        type="checkbox"
+        checked={showAmount}
+        onChange={async (e) => {
+          setShowAmount(e.target.checked)
+          await supabase
+            .from('edges')
+            .update({ show_amount: e.target.checked })
+            .eq('id', edge.id)
+          await refresh()
+        }}
+        className="accent-white"
+      />
+      Show amount on edge
+    </label>
+  </div>
 )}
-              {type !== 'Traffic' && (
-                <label className="ml-auto inline-flex items-center gap-2 text-xs">
-                  <input
-                    type="checkbox"
-                    checked={showAmount}
-                    onChange={async (e) => {
-                      setShowAmount(e.target.checked)
-                      await supabase.from('edges').update({ show_amount: e.target.checked }).eq('id', edge.id)
-                      await refresh()
-                    }}
-                    className="accent-white"
-                  />
-                  Show amount on edge
-                </label>
-              )}
-            </div>
 
             {/* TYPE == Traffic notice */}
             {type === 'Traffic' ? (
@@ -448,13 +443,21 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
                       onChange={(e) => setFilterText(e.target.value)}
                       className="h-8 w-40"
                     />
-                    <button
-                      onClick={() => setSortAsc(s => !s)}
-                      className="h-8 rounded-md border border-white/15 px-3 text-xs hover:bg-white/10"
-                      title="Toggle sort"
-                    >
-                      {sortAsc ? 'Oldest first' : 'Newest first'}
-                    </button>
+<button
+  onClick={() => setSortAsc(s => !s)}
+  className="h-8 w-8 flex items-center justify-center rounded-md border border-white/15 hover:bg-white/10"
+  title={sortAsc ? "Oldest first" : "Newest first"}
+>
+  {sortAsc ? (
+    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+    </svg>
+  ) : (
+    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+    </svg>
+  )}
+</button>
                   </div>
                 </div>
 
@@ -501,13 +504,13 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
       }`
     : ''}
 </div>
-                          <button
-                            onClick={() => deleteEntry(en.id)}
-                            className="inline-flex items-center gap-1 text-red-400 hover:text-red-300 text-sm"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                            Delete
-                          </button>
+<button
+  onClick={() => deleteEntry(en.id)}
+  className="inline-flex items-center text-red-400 hover:text-red-300"
+  title="Delete entry"
+>
+  <Trash2 className="h-4 w-4" />
+</button>
                         </div>
                       </div>
                     ))
