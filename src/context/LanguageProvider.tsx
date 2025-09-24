@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import en from '@/locales/en.json'
 import zhTW from '@/locales/zh_tw.json'
 
@@ -9,22 +9,37 @@ type Translations = typeof en
 
 const dictionaries: Record<Locale, Translations> = {
   en,
-  'zh_tw': zhTW,
+  zh_tw: zhTW,
 }
 
 type LanguageContextType = {
   lang: Locale
   setLang: (lang: Locale) => void
-  t: (key: keyof Translations, vars?: Record<string, string>) => string
+  t: (key: keyof Translations | string, vars?: Record<string, string>) => string
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined)
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [lang, setLang] = useState<Locale>('en')
+  const [lang, setLangState] = useState<Locale>('en')
 
-  const t = (key: keyof Translations, vars?: Record<string, string>) => {
-    let text = dictionaries[lang][key] || key
+  // hydrate from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('lang') as Locale | null
+    if (stored && (stored === 'en' || stored === 'zh_tw')) {
+      setLangState(stored)
+    }
+  }, [])
+
+  // wrapper to set both state and storage
+  const setLang = (newLang: Locale) => {
+    setLangState(newLang)
+    localStorage.setItem('lang', newLang)
+  }
+
+  const t = (key: string, vars?: Record<string, string>) => {
+    const dict = dictionaries[lang]
+    let text = (dict as any)[key] || key
     if (vars) {
       Object.entries(vars).forEach(([k, v]) => {
         text = text.replace(`{{${k}}}`, v)

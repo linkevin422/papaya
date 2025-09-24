@@ -41,6 +41,33 @@
     "forgot_password": "忘記密碼？",
     "reset_link_sent": "請至信箱收取重設連結",
     "send_reset_link": "發送重設連結",
-"sending": "發送中…"
+"sending": "發送中…",
+  "docs.flows.title": "理解金流：節點、連結與收入類型",
+  "docs.flows.intro": "金錢不會靜止不動。它會移動、增長，有時也會流失。在 Papaya 中，我們用「節點」與「連結」來視覺化這些流動，幫助你看見財務生態系統的全貌。",
+  "docs.flows.active_vs_passive.title": "主動收入與被動收入",
+  "docs.flows.active_label": "主動收入：",
+  "docs.flows.passive_label": "被動收入：",
+  "docs.flows.active_vs_passive.active": "透過投入時間與精力獲得的收入。例如：薪資、接案、家教、顧問。當你停止工作，收入也會停止。",
+  "docs.flows.active_vs_passive.passive": "一旦建立後，幾乎不需每天投入即可持續流入的收入。例如：股息、租金、版稅、已經上架影片的廣告收益。",
+  "docs.flows.nodes.title": "節點",
+  "docs.flows.nodes.desc": "節點代表一個存放價值或產生來源的容器。可以把節點想成金錢地圖上的『站點』。",
+  "docs.flows.nodes.types.pocket": "金錢實際存放的地方。例如錢包、銀行帳戶、現金盒。",
+  "docs.flows.nodes.types.platform": "託管或轉移金錢的平台。例如：YouTube、蝦皮、Patreon、Uber。",
+  "docs.flows.nodes.types.people": "在金流中扮演角色的人。例如：雇主、客戶、贊助者、合作夥伴。",
+  "docs.flows.nodes.types.portfolio": "能夠隨時間增值的投資。例如：股票、ETF、加密貨幣、不動產。",
+  "docs.flows.nodes.types.other": "不完全符合以上分類，但仍然重要的部分。",
+  "docs.flows.links.title": "連結",
+  "docs.flows.links.desc": "連結代表價值或金錢如何在節點之間移動。就像箭頭一樣，連接一個站點到另一個站點。",
+  "docs.flows.links.types.income": "金錢流入。例如：雇主薪水 → 你的銀行帳戶。",
+  "docs.flows.links.types.fuel": "維持系統運作所需的支出。例如：廣告費 → 平台，或租金 → 房東。",
+  "docs.flows.links.types.traffic": "非金錢但能創造價值的流動。例如：觀眾從 YouTube → 你的網店，或粉絲從 Instagram → 你的 Patreon。",
+  "docs.flows.why.title": "為什麼重要",
+  "docs.flows.why.text": "透過繪製節點與連結，你能看清自己生態系的全貌。不再只是分散的帳戶或工作，而能看到不同部分如何互相影響、互相滋養。",
+
+  "about": "關於",
+"my_flow": "我的金流",
+"pricing": "方案",
+"docs": "文件"
+
   }
   

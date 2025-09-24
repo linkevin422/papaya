@@ -5,6 +5,7 @@ import { Dialog } from '@headlessui/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { createClient } from '@/lib/supabase'
+import { Wallet, Globe, Users, Briefcase, HelpCircle } from 'lucide-react'
 
 type Props = {
   open: boolean
@@ -14,15 +15,20 @@ type Props = {
 }
 
 const NODE_TYPES = [
-  'Bank',
-  'Store',
-  'Product',
-  'Platform',
-  'Job',
-  'Investment',
-  'Sponsor',
-  'Other',
+  { value: 'Pocket', label: 'Pocket', icon: Wallet },
+  { value: 'Platform', label: 'Platform', icon: Globe },
+  { value: 'People', label: 'People', icon: Users },
+  { value: 'Portfolio', label: 'Portfolio', icon: Briefcase },
+  { value: 'Other', label: 'Other', icon: HelpCircle },
 ]
+
+const NODE_HINTS: Record<string, string> = {
+  Pocket: 'Cash, Bank Account, PayPal',
+  Platform: 'Shopee, YouTube, Stripe',
+  People: 'Employer, Client, Sponsor',
+  Portfolio: 'ETF, Crypto Wallet, Royalties',
+  Other: 'Anything else',
+}
 
 const supabase = createClient()
 
@@ -55,7 +61,9 @@ export default function NodeModal({ open, onClose, node, refresh }: Props) {
 
   // state
   const dirty = useMemo(
-    () => name.trim() !== (node.name || '').trim() || (type || '') !== (node.type || 'Platform'),
+    () =>
+      name.trim() !== (node.name || '').trim() ||
+      (type || '') !== (node.type || 'Platform'),
     [name, type, node.name, node.type]
   )
   const valid = name.trim().length > 0
@@ -64,7 +72,10 @@ export default function NodeModal({ open, onClose, node, refresh }: Props) {
   const handleSave = async () => {
     if (!valid || saving) return
     setSaving(true)
-    await supabase.from('nodes').update({ name: name.trim(), type }).eq('id', node.id)
+    await supabase
+      .from('nodes')
+      .update({ name: name.trim(), type })
+      .eq('id', node.id)
     setSaving(false)
     await refresh()
     onClose()
@@ -84,11 +95,15 @@ export default function NodeModal({ open, onClose, node, refresh }: Props) {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'enter') handleSave()
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'enter')
+        handleSave()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose, name, type])
+
+  const CurrentIcon =
+    NODE_TYPES.find((t) => t.value === type)?.icon || HelpCircle
 
   return (
     <Dialog open={open} onClose={onClose} className="fixed inset-0 z-50">
@@ -121,17 +136,23 @@ export default function NodeModal({ open, onClose, node, refresh }: Props) {
               <label className="mb-2 block text-xs uppercase tracking-wider text-white/60">
                 Type
               </label>
-              <select
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-                className="h-10 w-full rounded-lg bg-zinc-900 px-3 text-sm text-white outline-none border border-white/10 focus:ring-2 focus:ring-white/20"
-              >
-                {NODE_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
+              <div className="flex items-center gap-2">
+                <select
+                  value={type}
+                  onChange={(e) => setType(e.target.value)}
+                  className="h-10 flex-1 rounded-lg bg-zinc-900 px-3 text-sm text-white outline-none border border-white/10 focus:ring-2 focus:ring-white/20"
+                >
+                  {NODE_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+                <CurrentIcon className="h-5 w-5 text-white/70" />
+              </div>
+              <p className="mt-1 text-xs text-white/50">
+                Examples: {NODE_HINTS[type]}
+              </p>
             </div>
           </div>
 
@@ -164,7 +185,9 @@ export default function NodeModal({ open, onClose, node, refresh }: Props) {
 
             {typeof connectedCount === 'number' && connectedCount > 0 && (
               <div className="mt-2 text-xs text-red-300">
-                {connectedCount} link{connectedCount === 1 ? '' : 's'} connected to this node will be affected.
+                {connectedCount} link
+                {connectedCount === 1 ? '' : 's'} connected to this node will
+                be affected.
               </div>
             )}
           </div>
@@ -180,11 +203,17 @@ export default function NodeModal({ open, onClose, node, refresh }: Props) {
         <div className="fixed inset-0 bg-black/80" />
         <div className="fixed inset-0 flex items-center justify-center p-4">
           <Dialog.Panel className="w-full max-w-md space-y-4 rounded-xl border border-white/10 bg-zinc-950 p-6 text-white">
-            <Dialog.Title className="text-lg font-semibold">Delete Node?</Dialog.Title>
+            <Dialog.Title className="text-lg font-semibold">
+              Delete Node?
+            </Dialog.Title>
             <p className="text-sm text-white/80">
               You are about to delete <b>{name || 'this node'}</b>.
               {typeof connectedCount === 'number' && connectedCount > 0 ? (
-                <> This will also affect <b>{connectedCount}</b> connected link{connectedCount === 1 ? '' : 's'}.</>
+                <>
+                  {' '}
+                  This will also affect <b>{connectedCount}</b> connected link
+                  {connectedCount === 1 ? '' : 's'}.
+                </>
               ) : null}{' '}
               This action cannot be undone.
             </p>
@@ -195,7 +224,10 @@ export default function NodeModal({ open, onClose, node, refresh }: Props) {
               >
                 Cancel
               </button>
-              <Button onClick={handleDeleteConfirmed} className="h-10 bg-red-600 hover:bg-red-700">
+              <Button
+                onClick={handleDeleteConfirmed}
+                className="h-10 bg-red-600 hover:bg-red-700"
+              >
                 Delete Anyway
               </Button>
             </div>

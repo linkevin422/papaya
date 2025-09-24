@@ -41,6 +41,32 @@
     "forgot_password": "Forgot your password?",
     "send_reset_link": "Send reset link",
     "sending": "Sending",
-    "reset_link_sent": "Check your email for a reset link"
+    "reset_link_sent": "Check your email for a reset link",
+        "docs.flows.title": "Understanding Flows: Nodes, Links, and Income Types",
+        "docs.flows.intro": "Money doesn’t just sit still. It moves, grows, and sometimes leaks away. In Papaya, we use nodes and links to visualize this movement, showing how your financial ecosystem works.",
+        "docs.flows.active_vs_passive.title": "Active vs Passive Income",
+        "docs.flows.active_label": "Active income:",
+        "docs.flows.passive_label": "Passive income:",
+        "docs.flows.active_vs_passive.active": "Money you earn by putting in time and effort. Examples: wages, freelance projects, tutoring, consulting. If you stop working, the income stops.",
+        "docs.flows.active_vs_passive.passive": "Money that flows with little or no daily effort once it’s set up. Examples: dividends, rental income, royalties, or ad revenue from videos you’ve already posted.",
+        "docs.flows.nodes.title": "Nodes",
+        "docs.flows.nodes.desc": "A node is a container that holds value or represents a source. You can think of nodes as the stations in your money map.",
+        "docs.flows.nodes.types.pocket": "Where money actually sits. Think wallets, bank accounts, or cash jars.",
+        "docs.flows.nodes.types.platform": "Places that host or move your money. Examples: YouTube, Shopee, Patreon, Uber.",
+        "docs.flows.nodes.types.people": "Individuals who play a role in your flow. This could be an employer, client, sponsor, or collaborator.",
+        "docs.flows.nodes.types.portfolio": "Investments that (hopefully) grow your wealth over time. Stocks, ETFs, crypto, property holdings.",
+        "docs.flows.nodes.types.other": "Anything that doesn’t neatly fit the above, but still matters to your system.",
+        "docs.flows.links.title": "Links",
+        "docs.flows.links.desc": "A link shows how money or value moves between nodes. It’s the arrow that connects one station to another.",
+        "docs.flows.links.types.income": "Money flowing in. Example: paycheck from employer → your bank account.",
+        "docs.flows.links.types.fuel": "Money you spend to keep a system running. Example: ad spend → platform, or rent → landlord.",
+        "docs.flows.links.types.traffic": "Non-monetary flow that still creates value. Example: viewers moving from YouTube → your online store, or followers from Instagram → your Patreon.",
+        "docs.flows.why.title": "Why This Matters",
+        "docs.flows.why.text": "By mapping nodes and links, you see the bigger picture of your ecosystem. You stop thinking in isolated accounts or jobs and start noticing how different parts of your life feed each other.",      
+    
+    "about": "About",
+"my_flow": "My Flow",
+"pricing": "Pricing",
+"docs": "Docs"
     }
   

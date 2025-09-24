@@ -64,7 +64,7 @@ export default function Header() {
         {/* Center: Navigation */}
         <nav className="flex items-center gap-6">
           <Link href="/about" className="text-sm opacity-80 hover:opacity-100">
-            About
+            {t('about')}
           </Link>
           <Link
             href={
@@ -72,10 +72,13 @@ export default function Header() {
             }
             className="text-sm opacity-80 hover:opacity-100"
           >
-            My Flow
+            {t('my_flow')}
           </Link>
           <Link href="/pricing" className="text-sm opacity-80 hover:opacity-100">
-            Pricing
+            {t('pricing')}
+          </Link>
+          <Link href="/docs/flows" className="text-sm opacity-80 hover:opacity-100">
+            {t('docs')}
           </Link>
         </nav>
 
@@ -125,7 +128,7 @@ export default function Header() {
                   className="block px-4 py-2 text-sm hover:bg-neutral-900"
                   onClick={() => setMenuOpen(false)}
                 >
-                  Flows
+                  {t('my_flow')}
                 </Link>
 
                 <button
