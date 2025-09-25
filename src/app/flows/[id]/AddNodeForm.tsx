@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Wallet, Globe, Users, Briefcase, HelpCircle } from 'lucide-react'
 
 type Props = {
   flowId: string
@@ -13,35 +14,32 @@ type Props = {
 }
 
 const NODE_TYPES = [
-  'Bank',
-  'Store',
-  'Product',
-  'Platform',
-  'Job',
-  'Investment',
-  'Sponsor',
-  'Other',
+  { value: 'Pocket', label: 'Pocket', icon: Wallet, hint: 'Cash, Bank Account, PayPal' },
+  { value: 'Platform', label: 'Platform', icon: Globe, hint: 'Shopee, YouTube, Stripe' },
+  { value: 'People', label: 'People', icon: Users, hint: 'Employer, Client, Sponsor' },
+  { value: 'Portfolio', label: 'Portfolio', icon: Briefcase, hint: 'ETF, Crypto Wallet, Royalties' },
+  { value: 'Other', label: 'Other', icon: HelpCircle, hint: 'Anything else' },
 ]
 
 export default function AddNodeForm({ flowId, userId, onNodeAdded }: Props) {
   const supabase = createClient()
 
   const [name, setName] = useState('')
-  const [type, setType] = useState<string>('Platform')
+  const [type, setType] = useState<string>(NODE_TYPES[0].value) // default to first
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [touched, setTouched] = useState(false)
 
   // derived validity
   const nameClean = useMemo(() => name.trim(), [name])
-  const valid = nameClean.length > 0 && NODE_TYPES.includes(type)
+  const valid = nameClean.length > 0 && NODE_TYPES.some((t) => t.value === type)
 
   useEffect(() => {
     if (touched) setError(null)
   }, [name, type, touched])
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault() // prevent native tooltip
+    e.preventDefault()
     setTouched(true)
     if (!valid) return
 
@@ -66,20 +64,19 @@ export default function AddNodeForm({ flowId, userId, onNodeAdded }: Props) {
     }
 
     setName('')
-    setType('Platform')
+    setType(NODE_TYPES[0].value) // reset to default
     setLoading(false)
     onNodeAdded()
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      noValidate
-      className="w-full space-y-5"
-    >
+    <form onSubmit={handleSubmit} noValidate className="w-full space-y-5">
       {/* Name */}
       <div className="space-y-2">
-        <Label htmlFor="node-name" className="text-white/80 text-xs uppercase tracking-wider">
+        <Label
+          htmlFor="node-name"
+          className="text-white/80 text-xs uppercase tracking-wider"
+        >
           Node Name
         </Label>
         <Input
@@ -98,21 +95,34 @@ export default function AddNodeForm({ flowId, userId, onNodeAdded }: Props) {
 
       {/* Type */}
       <div className="space-y-2">
-        <Label htmlFor="node-type" className="text-white/80 text-xs uppercase tracking-wider">
+        <Label
+          htmlFor="node-type"
+          className="text-white/80 text-xs uppercase tracking-wider"
+        >
           Type
         </Label>
-        <select
-          id="node-type"
-          value={type}
-          onChange={(e) => setType(e.target.value)}
-          className="h-10 w-full rounded-lg bg-zinc-900 px-3 text-sm text-white outline-none border border-white/10 focus:ring-2 focus:ring-white/20"
-        >
-          {NODE_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
+        <div className="flex items-center gap-2">
+          <select
+            id="node-type"
+            value={type}
+            onChange={(e) => setType(e.target.value)}
+            className="h-10 flex-1 rounded-lg bg-zinc-900 px-3 text-sm text-white outline-none border border-white/10 focus:ring-2 focus:ring-white/20"
+          >
+            {NODE_TYPES.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+          {(() => {
+            const CurrentIcon =
+              NODE_TYPES.find((t) => t.value === type)?.icon || HelpCircle
+            return <CurrentIcon className="h-5 w-5 text-white/70" />
+          })()}
+        </div>
+        <p className="mt-1 text-xs text-white/50">
+          {NODE_TYPES.find((t) => t.value === type)?.hint}
+        </p>
       </div>
 
       {/* Errors */}

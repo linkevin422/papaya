@@ -1,4 +1,4 @@
-'use client'
+"use client";
 
 import {
   useCallback,
@@ -6,53 +6,55 @@ import {
   useMemo,
   useState,
   type ReactNode,
-} from 'react'
-import { Dialog } from '@headlessui/react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { createClient } from '@/lib/supabase'
-import { Trash2, PlusCircle, AlertTriangle } from 'lucide-react'
+} from "react";
+import { Dialog } from "@headlessui/react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { createClient } from "@/lib/supabase";
+import { Trash2, PlusCircle, AlertTriangle } from "lucide-react";
+import { convertAmount, calculateFlows } from "@/lib/math";
+import { getLatestRates } from "@/lib/rates";
 
 type Props = {
-  open: boolean
-  onClose: () => void
+  open: boolean;
+  onClose: () => void;
   edge: {
-    id: string
-    source_id: string
-    target_id: string
-    type: string | null
-    direction: string | null
-    label?: string | null
-    show_amount?: boolean | null
-  }
-  nodes: { id: string; name: string }[]
-  refresh: () => void
-}
+    id: string;
+    source_id: string;
+    target_id: string;
+    type: string | null;
+    direction: string | null;
+    label?: string | null;
+    show_amount?: boolean | null;
+  };
+  nodes: { id: string; name: string }[];
+  refresh: () => void;
+};
 
 type Entry = {
-  id: string
-  edge_id: string
-  entry_date: string
-  amount: number
-  note: string | null
-  created_at: string
-  original_amount?: number
-  original_currency?: string
-  converted_amount?: number
-}
+  id: string;
+  edge_id: string;
+  entry_date: string;
+  amount: number;
+  note: string | null;
+  created_at: string;
+  original_amount?: number;
+  original_currency?: string;
+  converted_amount?: number;
+};
 
 type EdgeRecurring = {
-  edge_id: string
-  daily_flow: number | null
-  monthly_flow: number | null
-  yearly_flow: number | null
-  entries_count: number
-}
+  edge_id: string;
+  daily_flow: number | null;
+  monthly_flow: number | null;
+  yearly_flow: number | null;
+  entries_count: number;
+};
 
-const supabase = createClient()
+const supabase = createClient();
 
 function cx(...cls: Array<string | false | null | undefined>) {
-  return cls.filter(Boolean).join(' ')
+  return cls.filter(Boolean).join(" ");
 }
 
 function Badge({ children }: { children: ReactNode }) {
@@ -60,226 +62,285 @@ function Badge({ children }: { children: ReactNode }) {
     <span className="inline-flex items-center rounded-full border border-white/10 bg-zinc-800 px-2.5 py-1 text-xs text-white/80">
       {children}
     </span>
-  )
+  );
 }
 
-export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props) {
+export default function EdgeModal({
+  open,
+  onClose,
+  edge,
+  nodes,
+  refresh,
+}: Props) {
   // edge meta
-  const [type, setType] = useState<'Income' | 'Traffic' | 'Fuel'>((edge.type as any) || 'Traffic')
-  const [dir, setDir] = useState<'a->b' | 'b->a' | 'both' | 'none'>((edge.direction as any) || 'a->b')
-  const [label, setLabel] = useState<string>(edge.label || '')
-  const [showAmount, setShowAmount] = useState<boolean>(edge.show_amount ?? true)
+  const [type, setType] = useState<"Income" | "Traffic" | "Fuel">(
+    (edge.type as any) || "Traffic"
+  );
+  const [dir, setDir] = useState<"a->b" | "b->a" | "both" | "none">(
+    (edge.direction as any) || "a->b"
+  );
+  const [label, setLabel] = useState<string>(edge.label || "");
+  const [showAmount, setShowAmount] = useState<boolean>(
+    edge.show_amount ?? true
+  );
 
   // entries
-  const [entries, setEntries] = useState<Entry[]>([])
-  const [loadingEntries, setLoadingEntries] = useState(false)
-  const [loadingRecurring, setLoadingRecurring] = useState(false)
+  const [entries, setEntries] = useState<Entry[]>([]);
+  const [loadingEntries, setLoadingEntries] = useState(false);
+  const [loadingRecurring, setLoadingRecurring] = useState(false);
 
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [sortAsc, setSortAsc] = useState(false)
-  const [filterText, setFilterText] = useState('')
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [sortAsc, setSortAsc] = useState(false);
+  const [filterText, setFilterText] = useState("");
 
   // confirmations
-  const [confirmingDeleteEdge, setConfirmingDeleteEdge] = useState(false)
-  const [confirmingSwitchType, setConfirmingSwitchType] = useState<null | 'Income' | 'Traffic' | 'Fuel'>(null)
+  const [confirmingDeleteEdge, setConfirmingDeleteEdge] = useState(false);
+  const [confirmingSwitchType, setConfirmingSwitchType] = useState<
+    null | "Income" | "Traffic" | "Fuel"
+  >(null);
 
-  const [recurring, setRecurring] = useState<EdgeRecurring | null>(null)
+  const [recurring, setRecurring] = useState<EdgeRecurring | null>(null);
 
   // new entry inputs
-  const [newAmount, setNewAmount] = useState<string>('')
-  const [newCurrency, setNewCurrency] = useState<string>('TWD')
-  const [newDate, setNewDate] = useState<string>(() => new Date().toISOString().slice(0, 10))
-  const [newNote, setNewNote] = useState<string>('')
+  const [newAmount, setNewAmount] = useState<string>("");
+  const [newCurrency, setNewCurrency] = useState<string>("TWD");
+  const [newDate, setNewDate] = useState<string>(() =>
+    new Date().toISOString().slice(0, 10)
+  );
+  const [newNote, setNewNote] = useState<string>("");
 
   // profile master currency
-  const [masterCurrency, setMasterCurrency] = useState<string>('TWD')
+  const [masterCurrency, setMasterCurrency] = useState<string>("TWD");
 
-  const nameOf = (id: string) => nodes.find((n) => n.id === id)?.name || 'Unknown'
-  const aName = useMemo(() => nameOf(edge.source_id), [edge.source_id, nodes])
-  const bName = useMemo(() => nameOf(edge.target_id), [edge.target_id, nodes])
+  const [rates, setRates] = useState<Record<string, number>>({});
+  const [flows, setFlows] = useState<{
+    daily: number;
+    monthly: number;
+    yearly: number;
+  } | null>(null);
 
-  const hasEntries = entries.length > 0
+  const nameOf = (id: string) =>
+    nodes.find((n) => n.id === id)?.name || "Unknown";
+  const aName = useMemo(() => nameOf(edge.source_id), [edge.source_id, nodes]);
+  const bName = useMemo(() => nameOf(edge.target_id), [edge.target_id, nodes]);
+
+  const hasEntries = entries.length > 0;
+
+  // ----- helpers -----
+  const effectiveRates = useCallback(() => {
+    // Do NOT override existing values. Just ensure essentials exist.
+    const r = { ...rates };
+    if (!r["USD"]) r["USD"] = 1; // most tables are normalized to USD
+    if (!r[masterCurrency]) r[masterCurrency] = r[masterCurrency] ?? 1;
+    return r;
+  }, [rates, masterCurrency]);
 
   // load profile master currency
   useEffect(() => {
-    ;(async () => {
-      const { data: userData } = await supabase.auth.getUser()
-      const id = userData.user?.id
-      if (!id) return
+    (async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      const id = userData.user?.id;
+      if (!id) return;
       const { data } = await supabase
-        .from('profiles')
-        .select('master_currency')
-        .eq('id', id)
-        .single()
+        .from("profiles")
+        .select("master_currency")
+        .eq("id", id)
+        .single();
       if (data?.master_currency) {
-        setMasterCurrency(data.master_currency)
-        setNewCurrency(data.master_currency)
+        setMasterCurrency(data.master_currency);
+        setNewCurrency(data.master_currency);
       }
-    })()
-  }, [])
+    })();
+  }, []);
+
+  // load rates once
+  useEffect(() => {
+    (async () => {
+      const latest = await getLatestRates();
+      setRates(latest || {});
+    })();
+  }, []);
 
   // loaders
   const loadEntries = useCallback(async () => {
-    if (!edge.id) return
-    setLoadingEntries(true)
+    if (!edge.id) return;
+    setLoadingEntries(true);
+
     const { data } = await supabase
-      .from('edge_entries')
-      .select('*')
-      .eq('edge_id', edge.id)
-      .order('entry_date', { ascending: false })
-    setEntries((data as any) || [])
-    setSelectedIds(new Set())
-    setLoadingEntries(false)
-  }, [edge.id])
+      .from("edge_entries")
+      .select("*")
+      .eq("edge_id", edge.id)
+      .order("entry_date", { ascending: false });
+
+    if (data) setEntries(data as any);
+    setLoadingEntries(false);
+  }, [edge.id]);
 
   const loadRecurring = useCallback(async () => {
-    if (!edge.id) return
-    setLoadingRecurring(true)
+    if (!edge.id) return;
+    if (!masterCurrency) return;
+    const r = effectiveRates();
+    if (Object.keys(r).length === 0) return;
+
+    setLoadingRecurring(true);
+
     const { data } = await supabase
-      .from('v_edge_recurring_flow')
-      .select('edge_id,daily_flow,monthly_flow,yearly_flow,entries_count')
-      .eq('edge_id', edge.id)
-      .maybeSingle()
-    setRecurring((data as any) || null)
-    setLoadingRecurring(false)
-  }, [edge.id])
+      .from("edge_entries")
+      .select("amount, original_amount, original_currency, entry_date")
+      .eq("edge_id", edge.id);
+
+    const rows = data || [];
+
+    // Convert each entry into master currency
+    const normalized = rows.map((e) => ({
+      amount: convertAmount(
+        e.original_amount ?? e.amount,
+        e.original_currency || masterCurrency,
+        masterCurrency,
+        r
+      ),
+      currency: masterCurrency,
+      date: e.entry_date,
+    }));
+
+    const totals = calculateFlows(normalized, masterCurrency, r);
+    setFlows(totals);
+
+    setLoadingRecurring(false);
+  }, [edge.id, masterCurrency, effectiveRates]);
+
+  // open → load entries; once entries + rates + masterCurrency are all ready → compute flows
+  useEffect(() => {
+    if (open && edge.id) loadEntries();
+  }, [open, edge.id, loadEntries]);
 
   useEffect(() => {
-    setType(((edge.type as any) || 'Traffic') as any)
-    setDir(((edge.direction as any) || 'a->b') as any)
-    setLabel(edge.label || '')
-    setShowAmount(edge.show_amount ?? true)
-    if (open && edge.id) {
-      loadEntries()
-      loadRecurring()
-    }
-  }, [open, edge, loadEntries, loadRecurring])
+    if (!open) return;
+    if (!edge.id) return;
+    if (!masterCurrency) return;
+    if (!hasEntries) return;
+    if (Object.keys(rates).length === 0) return;
+    loadRecurring();
+  }, [open, edge.id, hasEntries, masterCurrency, rates, loadRecurring]);
 
-  // add entry (RPC does conversion)
+  // add entry (RPC saves raw amount & currency; we re-read and recompute)
   const addEntry = async () => {
-    if (type === 'Traffic') return
-  
+    if (type === "Traffic") return;
+
     // Take only the left side before "≈", if present
-    let amtStr = newAmount.split('≈')[0].trim()
+    let amtStr = newAmount.split("≈")[0].trim();
     // Strip currency symbols/letters, keep digits and dot
-    amtStr = amtStr.replace(/[A-Za-z$€£¥₩]/g, '').trim()
-    // Normalize commas to dot
-    amtStr = amtStr.replace(/,/g, '.').replace(/[^\d.]/g, '')
-  
-    const amt = Number(amtStr)
-    if (!newDate || !amtStr || Number.isNaN(amt)) return
-  
-    const { data: userData, error: userErr } = await supabase.auth.getUser()
-    if (userErr) return
-    const userId = userData.user?.id
-    if (!userId) return
-  
-    const { error } = await supabase.rpc('add_edge_entry', {
+    amtStr = amtStr.replace(/[A-Za-z$€£¥₩]/g, "").trim();
+    // Normalize commas to dot and strip everything else
+    amtStr = amtStr.replace(/,/g, ".").replace(/[^\d.]/g, "");
+
+    const amt = Number(amtStr);
+    if (!newDate || !amtStr || Number.isNaN(amt)) return;
+
+    const { data: userData, error: userErr } = await supabase.auth.getUser();
+    if (userErr) return;
+    const userId = userData.user?.id;
+    if (!userId) return;
+
+    const { error } = await supabase.rpc("add_edge_entry", {
       p_user_id: userId,
       p_edge_id: String(edge.id),
       p_entry_date: newDate,
-      p_original_amount: amt,         // always just the numeric input
+      p_original_amount: amt,
       p_original_currency: newCurrency,
       p_note: newNote.trim() || null,
-    })
-    if (error) return
-  
-    setNewAmount('')
-    setNewNote('')
-    await loadEntries()
-    await loadRecurring()
-    await refresh()
-  }
-    
+    });
+    if (error) return;
+
+    setNewAmount("");
+    setNewNote("");
+    await loadEntries();
+    await loadRecurring();
+    await refresh();
+  };
+
   const deleteEntry = async (id: string) => {
-    await supabase.from('edge_entries').delete().eq('id', id)
-    await loadEntries()
-    await loadRecurring()
-    await refresh()
-  }
+    await supabase.from("edge_entries").delete().eq("id", id);
+    await loadEntries();
+    await loadRecurring();
+    await refresh();
+  };
 
   const bulkDeleteEntries = async () => {
-    if (selectedIds.size === 0) return
-    await supabase.from('edge_entries').delete().in('id', Array.from(selectedIds))
-    setSelectedIds(new Set())
-    await loadEntries()
-    await loadRecurring()
-    await refresh()
-  }
+    if (selectedIds.size === 0) return;
+    await supabase
+      .from("edge_entries")
+      .delete()
+      .in("id", Array.from(selectedIds));
+    setSelectedIds(new Set());
+    await loadEntries();
+    await loadRecurring();
+    await refresh();
+  };
 
-  // destructive edge ops (anon client assumes RLS grants owner delete; works same as your other deletes)
   const actuallyDeleteEdge = async () => {
-    // delete entries then the edge
-    await supabase.from('edge_entries').delete().eq('edge_id', edge.id)
-    await supabase.from('edges').delete().eq('id', edge.id)
-    setConfirmingDeleteEdge(false)
-    onClose()
-    await refresh()
-  }
+    await supabase.from("edge_entries").delete().eq("edge_id", edge.id);
+    await supabase.from("edges").delete().eq("id", edge.id);
+    setConfirmingDeleteEdge(false);
+    onClose();
+    await refresh();
+  };
 
-  const performSwitchType = async (nextType: 'Income' | 'Traffic' | 'Fuel') => {
-    // if switching to Traffic, entries are wiped
-    if (nextType === 'Traffic') {
-      await supabase.from('edge_entries').delete().eq('edge_id', edge.id)
+  const performSwitchType = async (nextType: "Income" | "Traffic" | "Fuel") => {
+    if (nextType === "Traffic") {
+      await supabase.from("edge_entries").delete().eq("edge_id", edge.id);
     }
-  
+
     const { error } = await supabase
-      .from('edges')
+      .from("edges")
       .update({ type: nextType })
-      .eq('id', edge.id)
-  
-    if (error) {
-      console.error('Failed to switch type:', error)
-      return
-    }
-  
-    setType(nextType)
-    setConfirmingSwitchType(null)
-    await loadEntries()
-    await loadRecurring()
-    await refresh()
-  }
-    
-  const fmtMoney = (n: number | null | undefined, cur?: string) =>
-    typeof n === 'number' ? `${cur || ''} ${n.toFixed(2)}` : 'N/A'
+      .eq("id", edge.id);
 
-  const fxRateMap: Record<string, number> = {
-    TWD: 34.5,
-    USD: 1,
-    EUR: 0.85,
-    JPY: 145,
-    CAD: 1.38,
-    GBP: 0.74,
-  }
-  
-  const convertUSD = (usd: number | null | undefined, to: string) =>
-    typeof usd === 'number' ? usd * (fxRateMap[to] ?? 1) : null
-  
+    if (error) {
+      console.error("Failed to switch type:", error);
+      return;
+    }
+
+    setType(nextType);
+    setConfirmingSwitchType(null);
+    await loadEntries();
+    await loadRecurring();
+    await refresh();
+  };
+
+  const fmtMoney = (n: number | null | undefined, cur?: string) =>
+    typeof n === "number" ? `${cur || ""} ${n.toFixed(2)}` : "N/A";
+
   const formatCurrency = (amt: number | null | undefined, cur: string) =>
-    typeof amt === 'number'
-      ? new Intl.NumberFormat('en-US', {
-          style: 'currency',
+    typeof amt === "number"
+      ? new Intl.NumberFormat("en-US", {
+          style: "currency",
           currency: cur,
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
         }).format(amt)
-      : 'N/A'
-  
+      : "N/A";
 
   const sortedFiltered = useMemo(() => {
     const filtered = filterText
-      ? entries.filter((e) => (e.note || '').toLowerCase().includes(filterText.toLowerCase()))
-      : entries
+      ? entries.filter((e) =>
+          (e.note || "").toLowerCase().includes(filterText.toLowerCase())
+        )
+      : entries;
     const sorted = [...filtered].sort((a, b) => {
-      const da = a.entry_date
-      const db = b.entry_date
-      return sortAsc ? da.localeCompare(db) : db.localeCompare(da)
-    })
-    return sorted
-  }, [entries, sortAsc, filterText])
+      const da = a.entry_date;
+      const db = b.entry_date;
+      return sortAsc ? da.localeCompare(db) : db.localeCompare(da);
+    });
+    return sorted;
+  }, [entries, sortAsc, filterText]);
 
-  const allOnPageIds = useMemo(() => sortedFiltered.map(e => e.id), [sortedFiltered])
-  const allSelectedOnPage = allOnPageIds.length > 0 && allOnPageIds.every(id => selectedIds.has(id))
+  const allOnPageIds = useMemo(
+    () => sortedFiltered.map((e) => e.id),
+    [sortedFiltered]
+  );
+  const allSelectedOnPage =
+    allOnPageIds.length > 0 && allOnPageIds.every((id) => selectedIds.has(id));
 
   return (
     <Dialog open={open} onClose={onClose} className="fixed inset-0 z-50">
@@ -293,29 +354,28 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
                 Edit Link
               </Dialog.Title>
               <div className="text-sm text-white/70 truncate">
-  <span className="font-medium">{aName}</span>
-  <span className="mx-2 text-white/50">→</span>
-  <span className="font-medium">{bName}</span>
-</div>
+                <span className="font-medium">{aName}</span>
+                <span className="mx-2 text-white/50">→</span>
+                <span className="font-medium">{bName}</span>
+              </div>
             </div>
 
-            {/* Quick actions: type select + dangerous ops */}
+            {/* Quick actions */}
             <div className="flex items-center gap-2">
-            <select
-  value={type}
-  onChange={(e) => {
-    const next = e.target.value as 'Income' | 'Traffic' | 'Fuel'
-    if (next === type) return
-    // Income <-> Traffic requires confirm
-    setConfirmingSwitchType(next as 'Income' | 'Traffic' | 'Fuel')
-  }}
-  className="h-9 rounded-md bg-black/40 border border-white/15 px-2 text-sm"
-  title="Switch type"
->
-  <option value="Income">Income</option>
-  <option value="Traffic">Traffic</option>
-  <option value="Fuel">Fuel</option>
-</select>
+              <select
+                value={type}
+                onChange={(e) => {
+                  const next = e.target.value as "Income" | "Traffic" | "Fuel";
+                  if (next === type) return;
+                  setConfirmingSwitchType(next);
+                }}
+                className="h-9 rounded-md bg-black/40 border border-white/15 px-2 text-sm"
+                title="Switch type"
+              >
+                <option value="Income">Income</option>
+                <option value="Traffic">Traffic</option>
+                <option value="Fuel">Fuel</option>
+              </select>
 
               <button
                 onClick={() => setConfirmingDeleteEdge(true)}
@@ -329,33 +389,35 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
 
           {/* Body */}
           <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
-{/* Top meta row */}
-{type !== 'Traffic' && (
-  <div className="flex flex-wrap items-center gap-2">
-    <label className="ml-auto inline-flex items-center gap-2 text-xs">
-      <input
-        type="checkbox"
-        checked={showAmount}
-        onChange={async (e) => {
-          setShowAmount(e.target.checked)
-          await supabase
-            .from('edges')
-            .update({ show_amount: e.target.checked })
-            .eq('id', edge.id)
-          await refresh()
-        }}
-        className="accent-white"
-      />
-      Show amount on edge
-    </label>
-  </div>
-)}
+            {/* Top meta row */}
+            {type !== "Traffic" && (
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="ml-auto inline-flex items-center gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={showAmount}
+                    onChange={async (e) => {
+                      setShowAmount(e.target.checked);
+                      await supabase
+                        .from("edges")
+                        .update({ show_amount: e.target.checked })
+                        .eq("id", edge.id);
+                      await refresh();
+                    }}
+                    className="accent-white"
+                  />
+                  Show amount on edge
+                </label>
+              </div>
+            )}
 
             {/* TYPE == Traffic notice */}
-            {type === 'Traffic' ? (
+            {type === "Traffic" ? (
               <div className="rounded-lg border border-white/10 bg-white/5 p-4">
                 <div className="text-sm text-white/80">
-                  This link is marked as <span className="font-semibold">Traffic</span>. It carries no money entries.
+                  This link is marked as{" "}
+                  <span className="font-semibold">Traffic</span>. It carries no
+                  money entries.
                 </div>
               </div>
             ) : (
@@ -398,10 +460,12 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
                   />
                   <button
                     onClick={addEntry}
-                    disabled={!newDate || !newAmount || Number.isNaN(Number(newAmount))}
+                    disabled={
+                      !newDate || !newAmount || Number.isNaN(Number(newAmount))
+                    }
                     className={cx(
-                      'h-10 rounded-lg px-3 inline-flex items-center gap-2 border transition',
-                      'border-white/20 text-white/90 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed'
+                      "h-10 rounded-lg px-3 inline-flex items-center gap-2 border transition",
+                      "border-white/20 text-white/90 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
                     )}
                   >
                     <PlusCircle className="h-4 w-4" />
@@ -418,11 +482,11 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
                         checked={allSelectedOnPage}
                         onChange={(e) => {
                           if (e.target.checked) {
-                            setSelectedIds(new Set(allOnPageIds))
+                            setSelectedIds(new Set(allOnPageIds));
                           } else {
-                            const next = new Set(selectedIds)
-                            allOnPageIds.forEach(id => next.delete(id))
-                            setSelectedIds(next)
+                            const next = new Set(selectedIds);
+                            allOnPageIds.forEach((id) => next.delete(id));
+                            setSelectedIds(next);
                           }
                         }}
                       />
@@ -430,7 +494,10 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
                     </label>
 
                     {selectedIds.size > 0 && (
-                      <Button onClick={bulkDeleteEntries} className="bg-red-600 hover:bg-red-700 text-white h-8 px-3 text-xs">
+                      <Button
+                        onClick={bulkDeleteEntries}
+                        className="bg-red-600 hover:bg-red-700 text-white h-8 px-3 text-xs"
+                      >
                         Delete {selectedIds.size} selected
                       </Button>
                     )}
@@ -443,29 +510,47 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
                       onChange={(e) => setFilterText(e.target.value)}
                       className="h-8 w-40"
                     />
-<button
-  onClick={() => setSortAsc(s => !s)}
-  className="h-8 w-8 flex items-center justify-center rounded-md border border-white/15 hover:bg-white/10"
-  title={sortAsc ? "Oldest first" : "Newest first"}
->
-  {sortAsc ? (
-    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-    </svg>
-  ) : (
-    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-    </svg>
-  )}
-</button>
+                    <button
+                      onClick={() => setSortAsc((s) => !s)}
+                      className="h-8 w-8 flex items-center justify-center rounded-md border border-white/15 hover:bg-white/10"
+                      title={sortAsc ? "Oldest first" : "Newest first"}
+                    >
+                      {sortAsc ? (
+                        <svg
+                          className="h-4 w-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 15l7-7 7 7"
+                          />
+                        </svg>
+                      ) : (
+                        <svg
+                          className="h-4 w-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M19 9l-7 7-7-7"
+                          />
+                        </svg>
+                      )}
+                    </button>
                   </div>
                 </div>
 
                 {/* Entries list */}
-                <div className="divide-y divide-white/5">
-                  {loadingEntries ? (
-                    <div className="p-4 text-sm text-white/70">Loading entries...</div>
-                  ) : sortedFiltered.length === 0 ? (
+                <div className="relative divide-y divide-white/5">
+                  {sortedFiltered.length === 0 ? (
                     <div className="p-4 text-sm text-white/70">No entries.</div>
                   ) : (
                     sortedFiltered.map((en) => (
@@ -478,44 +563,95 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
                             type="checkbox"
                             checked={selectedIds.has(en.id)}
                             onChange={(e) => {
-                              const next = new Set(selectedIds)
-                              if (e.target.checked) next.add(en.id)
-                              else next.delete(en.id)
-                              setSelectedIds(next)
+                              const next = new Set(selectedIds);
+                              if (e.target.checked) next.add(en.id);
+                              else next.delete(en.id);
+                              setSelectedIds(next);
                             }}
                           />
                           <div className="text-sm">
                             <div className="font-medium">{en.entry_date}</div>
                             <div className="text-white/70">
-                              {en.note || <span className="italic text-white/50">No note</span>}
+                              {en.note || (
+                                <span className="italic text-white/50">
+                                  No note
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
-                        <div className="font-semibold">
-  {type === 'Fuel'
-    ? `-${fmtMoney(en.original_amount ?? en.amount, en.original_currency)}`
-    : fmtMoney(en.original_amount ?? en.amount, en.original_currency)}
-  {en.original_currency !== masterCurrency && en.converted_amount
-    ? ` ≈ ${
-        type === 'Fuel'
-          ? `-${fmtMoney(en.converted_amount, masterCurrency)}`
-          : fmtMoney(en.converted_amount, masterCurrency)
-      }`
-    : ''}
-</div>
-<button
-  onClick={() => deleteEntry(en.id)}
-  className="inline-flex items-center text-red-400 hover:text-red-300"
-  title="Delete entry"
->
-  <Trash2 className="h-4 w-4" />
-</button>
+                          <div className="font-semibold">
+                            {type === "Fuel"
+                              ? `-${fmtMoney(
+                                  en.original_amount ?? en.amount,
+                                  en.original_currency
+                                )}`
+                              : fmtMoney(
+                                  en.original_amount ?? en.amount,
+                                  en.original_currency
+                                )}
+
+                            {/* show ≈ in master currency ONLY if different currency */}
+                            {(() => {
+                              const r = effectiveRates();
+                              const src =
+                                en.original_currency || masterCurrency;
+                              if (!src || src === masterCurrency) return ""; // skip if same currency
+                              const conv = convertAmount(
+                                en.original_amount ?? en.amount,
+                                src,
+                                masterCurrency,
+                                r
+                              );
+                              if (isNaN(conv)) return "";
+                              return ` ≈ ${
+                                type === "Fuel"
+                                  ? `-${fmtMoney(conv, masterCurrency)}`
+                                  : fmtMoney(conv, masterCurrency)
+                              }`;
+                            })()}
+                          </div>
+                          <button
+                            onClick={() => deleteEntry(en.id)}
+                            className="inline-flex items-center text-red-400 hover:text-red-300"
+                            title="Delete entry"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </div>
                       </div>
                     ))
                   )}
+                  {loadingEntries && (
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-sm text-white/70">
+                      Refreshing…
+                    </div>
+                  )}
                 </div>
+              </div>
+            )}
+
+            {/* Flows summary */}
+            {type !== "Traffic" && (
+              <div className="rounded-lg border border-white/10 bg-white/5 p-4 text-sm text-white/80">
+                {flows ? (
+                  <div className="space-y-1">
+                    <div>
+                      Daily: {formatCurrency(flows.daily, masterCurrency)}
+                    </div>
+                    <div>
+                      Monthly: {formatCurrency(flows.monthly, masterCurrency)}
+                    </div>
+                    <div>
+                      Yearly: {formatCurrency(flows.yearly, masterCurrency)}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="italic text-white/60">
+                    No flow data available.
+                  </div>
+                )}
               </div>
             )}
 
@@ -525,10 +661,14 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="h-5 w-5 flex-none" />
                   <div>
-                    <p className="font-semibold">Switch link type to {confirmingSwitchType}?</p>
+                    <p className="font-semibold">
+                      Switch link type to {confirmingSwitchType}?
+                    </p>
                     <p className="mt-1 text-sm">
-                      Switching between Income and Traffic will change how this link behaves.
-                      {confirmingSwitchType === 'Traffic' && ' Moving to Traffic will delete all existing entries on this link.'}
+                      Switching between Income and Traffic will change how this
+                      link behaves.
+                      {confirmingSwitchType === "Traffic" &&
+                        " Moving to Traffic will delete all existing entries on this link."}
                     </p>
                     <div className="mt-3 flex gap-2">
                       <Button
@@ -537,7 +677,10 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
                       >
                         Confirm switch
                       </Button>
-                      <Button onClick={() => setConfirmingSwitchType(null)} className="border border-white/15 bg-transparent">
+                      <Button
+                        onClick={() => setConfirmingSwitchType(null)}
+                        className="border border-white/15 bg-transparent"
+                      >
                         Cancel
                       </Button>
                     </div>
@@ -554,13 +697,21 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
                   <div>
                     <p className="font-semibold">Delete this link?</p>
                     <p className="mt-1 text-sm">
-                      This will permanently delete {entries.length} entr{entries.length === 1 ? 'y' : 'ies'} attached to this link and the link itself.
+                      This will permanently delete {entries.length} entr
+                      {entries.length === 1 ? "y" : "ies"} attached to this link
+                      and the link itself.
                     </p>
                     <div className="mt-3 flex gap-2">
-                      <Button onClick={actuallyDeleteEdge} className="bg-red-700 hover:bg-red-800 text-white">
+                      <Button
+                        onClick={actuallyDeleteEdge}
+                        className="bg-red-700 hover:bg-red-800 text-white"
+                      >
                         Confirm delete
                       </Button>
-                      <Button onClick={() => setConfirmingDeleteEdge(false)} className="border border-white/15 bg-transparent">
+                      <Button
+                        onClick={() => setConfirmingDeleteEdge(false)}
+                        className="border border-white/15 bg-transparent"
+                      >
                         Cancel
                       </Button>
                     </div>
@@ -573,8 +724,13 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
           {/* Footer */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-6 border-t border-white/10">
             <div className="flex items-center gap-2 text-xs text-white/60">
-              {type !== 'Traffic' ? (
-                <span>Master currency: <span className="font-semibold text-white">{masterCurrency}</span></span>
+              {type !== "Traffic" ? (
+                <span>
+                  Master currency:{" "}
+                  <span className="font-semibold text-white">
+                    {masterCurrency}
+                  </span>
+                </span>
               ) : (
                 <span>Traffic link, no monetary entries.</span>
               )}
@@ -590,5 +746,5 @@ export default function EdgeModal({ open, onClose, edge, nodes, refresh }: Props
         </Dialog.Panel>
       </div>
     </Dialog>
-  )
+  );
 }
