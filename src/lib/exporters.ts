@@ -68,11 +68,23 @@ export async function exportPNG(
   element: HTMLElement,
   { filename = 'flow.png', watermarkText }: { filename?: string; watermarkText?: string } = {}
 ) {
+  // Fix missing font shorthand for html-to-image
+  element.querySelectorAll<HTMLElement>('*').forEach((el) => {
+    const style = getComputedStyle(el)
+    // Firefox: style.font may be "" or undefined
+    if (!style.font || style.font.trim() === '') {
+      const family = style.fontFamily || 'sans-serif'
+      const size = style.fontSize || '14px'
+      const weight = style.fontWeight || '400'
+      el.style.font = `${weight} ${size} ${family}`
+    }
+  })
+  
   const dataUrl = await htmlToImage.toPng(element, {
     pixelRatio: 2,
     backgroundColor: '#0a0a0a',
     cacheBust: true,
-    filter: (node) => filterNode(node as HTMLElement),
+    filter: (node: HTMLElement) => filterNode(node),
   })
 
   const finalUrl = watermarkText ? await addWatermark(dataUrl, watermarkText) : dataUrl

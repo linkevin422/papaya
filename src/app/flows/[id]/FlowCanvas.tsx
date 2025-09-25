@@ -18,7 +18,6 @@ import { BackgroundVariant } from '@reactflow/background'
 import 'reactflow/dist/style.css'
 import { createClient } from '@/lib/supabase'
 import { useProfile } from '@/context/ProfileProvider'
-import { exportPNG, exportPDF, exportJSON, exportCSV } from '@/lib/exporters'
 
 const supabase = createClient()
 
@@ -48,14 +47,27 @@ export default function FlowCanvas({
   viewMode,
 }: Props) {
   const [nodesState, setNodesState, onNodesChange] = useNodesState(nodes)
-  const [edgesState, setEdgesState, onEdgesChange] = useEdgesState(edges)
-  const { profile } = useProfile()
-
-  // Capture area for PNG/PDF
-  const exportRef = useRef<HTMLDivElement>(null)
+  const decorateEdge = (e: Edge): Edge => ({
+    ...e,
+    labelStyle: {
+      fill: '#f5f5f5',
+      fontSize: 13,
+      fontWeight: 600,
+      fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI',
+    },
+    labelBgStyle: {
+      fill: 'rgba(24,24,27,0.85)',
+      stroke: 'rgba(255,255,255,0.12)',
+      strokeWidth: 1,
+      borderRadius: 8,
+      padding: 6,
+    },
+  })
+  const [edgesState, setEdgesState, onEdgesChange] = useEdgesState(edges.map(decorateEdge))
+    const { profile } = useProfile()
 
   useEffect(() => { setNodesState(nodes) }, [nodes, setNodesState])
-  useEffect(() => { setEdgesState(edges) }, [edges, setEdgesState])
+  useEffect(() => { setEdgesState(edges.map(decorateEdge)) }, [edges, setEdgesState])
 
   const onConnect: OnConnect = useCallback(
     async (connection: Connection) => {
@@ -66,16 +78,17 @@ export default function FlowCanvas({
       const strokeColor = EDGE_COLOR.Traffic || '#e5e7eb'
   
       // optimistic edge
-      const newEdge: Edge = {
+      const newEdge: Edge = decorateEdge({
         id: newId,
         source: connection.source,
         target: connection.target,
         markerEnd: { type: MarkerType.ArrowClosed, color: strokeColor },
         animated: true,
         style: { stroke: strokeColor, strokeWidth: 2 },
+        // no label here; DB/refresh will supply the calculated text
         data: { direction: 'a->b', linkType: type },
-      }
-      setEdgesState(eds => addEdge(newEdge, eds))
+      })
+            setEdgesState(eds => addEdge(newEdge, eds))
   
       // insert (include id because edges.id is NOT NULL)
       const { error } = await supabase.from('edges').insert({
@@ -109,102 +122,12 @@ export default function FlowCanvas({
     },
     [refresh]
   )
-
-  // Export helpers
-  const isPro = (profile?.subscription_level ?? 'basic') === 'pro'
-  const watermarkText = useMemo(() => (isPro ? undefined : 'Papaya • Basic'), [isPro])
-
-  const basename = useMemo(() => {
-    const first = nodesState[0]?.data as any
-    const name = (first?.label || first?.name || 'flow').toString()
-    return name.replace(/[^\w\- ]+/g, '').replace(/\s+/g, '_').slice(0, 40)
-  }, [nodesState])
-
-  const handleExportPNG = async () => {
-    if (!exportRef.current) return
-    await exportPNG(exportRef.current, {
-      filename: `${basename}.png`,
-      watermarkText,
-    })
-  }
-
-  const handleExportPDF = async () => {
-    if (!exportRef.current) return
-    await exportPDF(exportRef.current, {
-      filename: `${basename}.pdf`,
-      watermarkText,
-    })
-  }
-
-  const handleExportJSON = () => {
-    exportJSON(nodesState, edgesState, `${basename}.json`)
-  }
-
-  const handleExportCSV = () => {
-    exportCSV(nodesState, edgesState, basename)
-  }
-
   return (
     <div className="relative h-[80vh] w-full">
       
-      {/* Tiny export menu (ignored in exports) */}
-{/* Tiny export menu (ignored in exports) */}
-<div
-  data-export-ignore="true"
-  className="absolute right-3 top-3 z-10"
->
-  <details className="group relative">
-    <summary
-      className="flex h-9 w-9 cursor-pointer select-none items-center justify-center rounded-lg border border-white/10 bg-zinc-900/80 text-white hover:bg-zinc-800/80"
-      title={isPro ? 'Export' : 'Export (watermark)'}
-    >
-      {/* download icon */}
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <path d="M12 3a1 1 0 0 1 1 1v8.586l2.293-2.293a1 1 0 1 1 1.414 1.414l-4.004 4.004a1 1 0 0 1-1.414 0L7.286 11.707a1 1 0 1 1 1.414-1.414L11 12.586V4a1 1 0 0 1 1-1Z"/>
-        <path d="M4 15a1 1 0 0 1 1 1v2h14v-2a1 1 0 1 1 2 0v3a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-3a1 1 0 0 1 2 0v2h2v-2a1 1 0 1 1 1-1Z"/>
-      </svg>
-    </summary>
-
-    <div className="absolute right-0 mt-2 w-40 rounded-xl border border-white/10 bg-zinc-900/95 p-1 shadow-xl backdrop-blur">
-      {/* Always available: PNG */}
-      <button
-        onClick={handleExportPNG}
-        className="w-full rounded-lg px-3 py-2 text-left text-sm text-white hover:bg-white/10"
-      >
-        PNG {isPro ? '' : '(wm)'}
-      </button>
-
-      {/* Pro-only options */}
-      {isPro && (
-        <>
-          <button
-            onClick={handleExportPDF}
-            className="w-full rounded-lg px-3 py-2 text-left text-sm text-white hover:bg-white/10"
-          >
-            PDF
-          </button>
-          <div className="my-1 h-px bg-white/10" />
-          <button
-            onClick={handleExportJSON}
-            className="w-full rounded-lg px-3 py-2 text-left text-sm text-white hover:bg-white/10"
-          >
-            JSON
-          </button>
-          <button
-            onClick={handleExportCSV}
-            className="w-full rounded-lg px-3 py-2 text-left text-sm text-white hover:bg-white/10"
-          >
-            CSV
-          </button>
-        </>
-      )}
-    </div>
-  </details>
-</div>
-
       {/* Export scope wrapper */}
-      <div ref={exportRef} className="h-full w-full">
-        <ReactFlow
+      <div className="h-full w-full">
+              <ReactFlow
           nodes={nodesState}
           edges={edgesState}
           onNodesChange={onNodesChange}

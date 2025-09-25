@@ -14,7 +14,7 @@
   import TimeframeSwitcher from '@/components/TimeframeSwitcher'
   import { useProfile } from '@/context/ProfileProvider'
   import { getLatestRates } from '@/lib/rates'
-
+  import { Pencil } from 'lucide-react'
 
 
   const supabase = createClient()
@@ -101,6 +101,9 @@
     const [selectedEdge, setSelectedEdge] = useState<EdgeData | null>(null)
     const [showAddNode, setShowAddNode] = useState(false)
     const [layingOut, setLayingOut] = useState(false)
+    const [confirmOpen, setConfirmOpen] = useState(false)
+    const [visibilityOpen, setVisibilityOpen] = useState(false)
+
 
   // headline totals
   const [daily, setDaily] = useState<number>(0)
@@ -487,8 +490,9 @@ if (shouldShow) {
     }
 
     return (
-      <main className="relative w-full text-white">
-        <FlowSwitcher />
+<main className="relative flex justify-center w-full text-white">
+  <div className="w-full max-w-6xl rounded-2xl border border-white/10 bg-black/40 backdrop-blur">
+    {/* existing header + canvas + modals go inside this */}
     
         {/* Header with stats and controls */}
         <div className="sticky top-0 z-30 bg-black/50 backdrop-blur supports-[backdrop-filter]:bg-black/30">
@@ -517,13 +521,14 @@ if (shouldShow) {
                       </>
                     ) : (
                       <>
-                        <h1 className="truncate text-2xl font-semibold">{flow?.name || '…'}</h1>
-                        <button
-                          onClick={() => setEditingName(true)}
-                          className="rounded-md border border-white/15 px-2 py-1 text-xs"
-                        >
-                          Rename
-                        </button>
+<h1 className="truncate text-2xl font-semibold">{flow?.name || '…'}</h1>
+<button
+  onClick={() => setEditingName(true)}
+  className="rounded-md p-1 text-zinc-400 hover:text-white"
+  title="Rename flow"
+>
+  <Pencil size={16} />
+</button>
                       </>
                     )}
                   </div>
@@ -584,34 +589,117 @@ if (shouldShow) {
           </label>
         </div>
 
-                    {/* Group 1: Visibility */}
-                    <div className="flex flex-none items-center gap-1 rounded-md border border-white/15 bg-black/40 p-1">
-                      <select
-                        value={flow?.privacy || 'private'}
-                        onChange={(e) => updatePrivacy(e.target.value as 'private' | 'public')}
-                        className="h-8 rounded-md bg-transparent px-2 text-sm outline-none"
-                        title="Privacy"
-                      >
-                        <option value="private">Private</option>
-                        <option value="public">Public</option>
-                      </select>
 
-                      {flow?.privacy === 'public' && <div className="h-6 w-px bg-white/10" />}
+{/* Group 1: Visibility */}
+<button
+  onClick={() => setVisibilityOpen(true)}
+  className="h-9 flex-none rounded-md border border-white/15 px-3 text-sm hover:bg-white/10"
+>
+  {flow?.privacy === 'public' ? 'Public' : 'Private'}
+</button>
 
-                      {flow?.privacy === 'public' && (
-                        <select
-                          value={flow.public_mode ?? 1}
-                          onChange={(e) => updatePublicMode(Number(e.target.value))}
-                          className="h-8 rounded-md bg-transparent px-2 text-sm outline-none"
-                          title="Public view mode"
-                        >
-                          <option value={1}>No earnings</option>
-                          <option value={2}>Show earnings</option>
-                          <option value={3}>Earnings + details</option>
-                        </select>
-                      )}
-                    </div>
+<Dialog open={visibilityOpen} onClose={() => setVisibilityOpen(false)} className="fixed inset-0 z-50">
+  <div className="fixed inset-0 bg-black/70" />
+  <div className="fixed inset-0 flex items-center justify-center p-4">
+    <Dialog.Panel className="w-full max-w-md rounded-2xl border border-white/10 bg-zinc-950 p-6 text-white">
+      <Dialog.Title className="mb-4 text-lg font-semibold">Flow Visibility</Dialog.Title>
 
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm mb-1">Privacy</label>
+          <select
+            value={flow?.privacy || 'private'}
+            onChange={(e) => updatePrivacy(e.target.value as 'private' | 'public')}
+            className="w-full rounded-md bg-black/40 border border-white/10 px-2 py-1 text-sm outline-none"
+          >
+            <option value="private">Private</option>
+            <option value="public">Public</option>
+          </select>
+        </div>
+
+        {flow?.privacy === 'public' && (
+          <>
+            <div>
+              <label className="block text-sm mb-1">Public Mode</label>
+              <select
+                value={flow.public_mode ?? 1}
+                onChange={(e) => updatePublicMode(Number(e.target.value))}
+                className="w-full rounded-md bg-black/40 border border-white/10 px-2 py-1 text-sm outline-none"
+              >
+                <option value={1}>No earnings</option>
+                <option value={2}>Show earnings</option>
+                <option value={3}>Earnings + details</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm mb-1">Share Link</label>
+              <div className="flex gap-2">
+                <input
+                  readOnly
+                  value={shareUrl}
+                  className="flex-1 truncate rounded-md border border-white/15 bg-black/40 px-2 text-sm"
+                />
+                <button
+                  onClick={async () => { if (shareUrl) await navigator.clipboard.writeText(shareUrl) }}
+                  className="rounded-md border border-white/15 px-3 text-sm hover:bg-white/10"
+                >
+                  Copy
+                </button>
+              </div>
+              <label className="mt-2 inline-flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="accent-white"
+                  checked={shareNoAmounts}
+                  onChange={(e) => setShareNoAmounts(e.target.checked)}
+                />
+                Hide all amounts in shared link
+              </label>
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="mt-6 flex justify-end gap-2">
+        <button
+          onClick={() => setVisibilityOpen(false)}
+          className="rounded-md border border-white/15 px-3 py-1"
+        >
+          Close
+        </button>
+      </div>
+    </Dialog.Panel>
+  </div>
+</Dialog>
+
+{/* Confirm dialog */}
+<Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)} className="fixed inset-0 z-50">
+  <div className="fixed inset-0 bg-black/70" />
+  <div className="fixed inset-0 flex items-center justify-center p-4">
+    <Dialog.Panel className="w-full max-w-sm rounded-2xl border border-white/10 bg-zinc-950 p-6 text-white">
+      <Dialog.Title className="mb-4 text-lg font-semibold">Make flow public?</Dialog.Title>
+      <p className="text-sm text-zinc-400 mb-6">Anyone with the link will be able to see it.</p>
+      <div className="flex justify-end gap-2">
+        <button
+          onClick={() => setConfirmOpen(false)}
+          className="rounded-md border border-white/15 px-3 py-1"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={async () => {
+            await updatePrivacy('public')
+            setConfirmOpen(false)
+          }}
+          className="rounded-md bg-green-600 px-3 py-1 hover:bg-green-500"
+        >
+          Confirm
+        </button>
+      </div>
+    </Dialog.Panel>
+  </div>
+</Dialog>
                     {/* Group 2: Share popover */}
                     {flow?.privacy === 'public' && (
                       <Popover className="relative flex-none">
@@ -768,6 +856,7 @@ if (shouldShow) {
             refresh={() => (flow?.id ? refreshCanvas(flow.id) : Promise.resolve())}
           />
         )}
-      </main>
+  </div>
+</main>
     )
   }
