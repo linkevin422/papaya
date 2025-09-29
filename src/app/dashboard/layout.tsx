@@ -1,9 +1,15 @@
-// /src/app/dashboard/layout.tsx
-'use client'
+"use client";
 
-import React from 'react'
+import React from "react";
+import { useLanguage } from "@/context/LanguageProvider";
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const { t } = useLanguage();
+
   return (
     <div className="min-h-dvh grid grid-cols-1 md:grid-cols-[240px_1fr] bg-neutral-950 text-neutral-100">
       {/* Sidebar (desktop only) */}
@@ -13,21 +19,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             href="/dashboard"
             className="block rounded-lg px-3 py-2 hover:bg-neutral-900"
           >
-            Overview
+            {t("overview")}
           </a>
           <a
             href="/dashboard/settings"
             className="block rounded-lg px-3 py-2 hover:bg-neutral-900"
           >
-            Settings
+            {t("settings")}
           </a>
         </nav>
       </aside>
 
-      {/* Main content (no inner header) */}
-      <main className="p-4">
-        {children}
-      </main>
+      {/* Main content */}
+      <main className="p-4">{children}</main>
     </div>
-  )
+  );
 }

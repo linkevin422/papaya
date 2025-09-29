@@ -52,6 +52,7 @@ type EdgeData = {
   direction: string | null;
   label?: string | null;
   show_amount?: boolean | null;
+  excluded?: boolean | null; // <—
   daily_flow?: number | null;
   monthly_flow?: number | null;
   yearly_flow?: number | null;
@@ -161,7 +162,9 @@ export default function FlowPage() {
     // 1) Base edges
     const { data: base } = await supabase
       .from("edges")
-      .select("id,flow_id,source_id,target_id,type,direction,label,show_amount")
+      .select(
+        "id,flow_id,source_id,target_id,type,direction,label,show_amount,excluded"
+      )
       .eq("flow_id", fid);
 
     const baseEdges = (base as EdgeData[]) || [];
@@ -208,6 +211,7 @@ export default function FlowPage() {
     // 5) Attach entries + compute flows
     const merged = baseEdges.map((e) => {
       const list = grouped.get(e.id) || [];
+      const isExcluded = (e as any).excluded === true;
 
       const normalized = list.map((entry) => ({
         amount: convertAmount(
@@ -225,12 +229,15 @@ export default function FlowPage() {
           ? calculateFlows(normalized, masterCurrency, rates)
           : { daily: 0, monthly: 0, yearly: 0 };
 
+      const flowVals = isExcluded ? { daily: 0, monthly: 0, yearly: 0 } : flows;
+
       return {
         ...e,
+        excluded: isExcluded,
         entries: list,
-        daily_flow: flows.daily,
-        monthly_flow: flows.monthly,
-        yearly_flow: flows.yearly,
+        daily_flow: flowVals.daily,
+        monthly_flow: flowVals.monthly,
+        yearly_flow: flowVals.yearly,
         entries_count: normalized.length,
       };
     });
@@ -239,11 +246,14 @@ export default function FlowPage() {
 
     // 6) Totals for header
     const totals = merged.reduce(
-      (acc, e) => ({
-        daily: acc.daily + (e.daily_flow ?? 0),
-        monthly: acc.monthly + (e.monthly_flow ?? 0),
-        yearly: acc.yearly + (e.yearly_flow ?? 0),
-      }),
+      (acc, e) => {
+        if (e.excluded) return acc;
+        return {
+          daily: acc.daily + (e.daily_flow ?? 0),
+          monthly: acc.monthly + (e.monthly_flow ?? 0),
+          yearly: acc.yearly + (e.yearly_flow ?? 0),
+        };
+      },
       { daily: 0, monthly: 0, yearly: 0 }
     );
     setDaily(totals.daily);
@@ -474,14 +484,17 @@ export default function FlowPage() {
           type: "default",
           data: {
             label: (
-              <div className="flex items-center gap-2 px-3 py-2">
+              <div
+                className="flex items-center gap-2 px-3 py-2 max-w-[200px]"
+                title={n.name} // show full name on hover
+              >
                 <div
-                  className="flex h-7 w-7 items-center justify-center rounded-full"
+                  className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full"
                   style={{ backgroundColor: color }}
                 >
                   <Icon className="h-4 w-4 text-white" />
                 </div>
-                <span className="truncate font-medium">{n.name}</span>
+                <span className="truncate min-w-0 font-medium">{n.name}</span>
               </div>
             ),
           },
@@ -509,7 +522,11 @@ export default function FlowPage() {
       const dir = normalizeDir(e.direction || undefined);
       const isBoth = dir === "both";
       const isNone = dir === "none";
-      const stroke = EDGE_COLOR[normalizeType(e.type)] || "#e5e7eb";
+      const isExcluded = (e as any).excluded === true;
+
+      const stroke = isExcluded
+        ? "#ef4444"
+        : EDGE_COLOR[normalizeType(e.type)] || "#e5e7eb";
 
       // fallback rate map
       const r = { ...rates };
@@ -517,7 +534,6 @@ export default function FlowPage() {
       if (!r["USD"]) r["USD"] = 1;
       if (!r[masterCurrency]) r[masterCurrency] = 1;
 
-      // recompute flows per edge
       const entries =
         ((e as any).entries as {
           amount: number;
@@ -540,7 +556,8 @@ export default function FlowPage() {
           ? flows.monthly
           : flows.yearly;
 
-      const shouldShow = e.show_amount !== false && showAmountsForViewer;
+      const shouldShow =
+        e.show_amount !== false && showAmountsForViewer && !isExcluded;
       const hasEnough = entries.length >= 2;
 
       let amountText: string | null = null;
@@ -555,6 +572,10 @@ export default function FlowPage() {
           ? `${e.label} • ${amountText}`
           : amountText || e.label || undefined;
 
+      const style = isNone
+        ? { stroke, strokeDasharray: "6 6", strokeWidth: 2 }
+        : { stroke, strokeWidth: 2 };
+
       return {
         id: e.id,
         source: e.source_id,
@@ -567,9 +588,7 @@ export default function FlowPage() {
         markerEnd: isNone
           ? undefined
           : { type: MarkerType.ArrowClosed, color: stroke },
-        style: isNone
-          ? { stroke, strokeDasharray: "6 6", strokeWidth: 2 }
-          : { stroke, strokeWidth: 2 },
+        style,
         data: {
           direction: dir,
           linkType: e.type,

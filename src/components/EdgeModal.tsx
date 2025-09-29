@@ -26,6 +26,7 @@ type Props = {
     direction: string | null;
     label?: string | null;
     show_amount?: boolean | null;
+    excluded?: boolean | null; // <—
   };
   nodes: { id: string; name: string }[];
   refresh: () => void;
@@ -83,6 +84,7 @@ export default function EdgeModal({
   const [showAmount, setShowAmount] = useState<boolean>(
     edge.show_amount ?? true
   );
+  const [excluded, setExcluded] = useState<boolean>(!!edge.excluded); // <—
 
   // entries
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -392,6 +394,23 @@ export default function EdgeModal({
             {/* Top meta row */}
             {type !== "Traffic" && (
               <div className="flex flex-wrap items-center gap-2">
+                <label className="inline-flex items-center gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    checked={excluded}
+                    onChange={async (e) => {
+                      setExcluded(e.target.checked);
+                      await supabase
+                        .from("edges")
+                        .update({ excluded: e.target.checked })
+                        .eq("id", edge.id);
+                      await refresh();
+                    }}
+                    className="accent-red-500"
+                  />
+                  Exclude from totals
+                </label>
+
                 <label className="ml-auto inline-flex items-center gap-2 text-xs">
                   <input
                     type="checkbox"
@@ -439,18 +458,34 @@ export default function EdgeModal({
                       onChange={(e) => setNewAmount(e.target.value)}
                       className="h-10 flex-1"
                     />
-                    <select
-                      value={newCurrency}
-                      onChange={(e) => setNewCurrency(e.target.value)}
-                      className="rounded-lg bg-zinc-900 border border-white/10 px-2 text-sm text-white"
-                    >
-                      <option value={masterCurrency}>{masterCurrency}</option>
-                      <option value="USD">USD</option>
-                      <option value="EUR">EUR</option>
-                      <option value="JPY">JPY</option>
-                      <option value="CAD">CAD</option>
-                      <option value="GBP">GBP</option>
-                    </select>
+                    {(() => {
+                      const baseCurrencies: string[] = [
+                        "TWD",
+                        "USD",
+                        "EUR",
+                        "JPY",
+                        "CAD",
+                        "GBP",
+                      ];
+                      const currencies = [masterCurrency, ...baseCurrencies];
+                      const uniqueCurrencies: string[] = Array.from(
+                        new Set(currencies)
+                      );
+
+                      return (
+                        <select
+                          value={newCurrency}
+                          onChange={(e) => setNewCurrency(e.target.value)}
+                          className="rounded-lg bg-zinc-900 border border-white/10 px-2 text-sm text-white"
+                        >
+                          {uniqueCurrencies.map((cur: string) => (
+                            <option key={cur} value={cur}>
+                              {cur}
+                            </option>
+                          ))}
+                        </select>
+                      );
+                    })()}
                   </div>
                   <Input
                     placeholder="Note (optional)"

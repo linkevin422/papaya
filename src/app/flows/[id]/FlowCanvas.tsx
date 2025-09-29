@@ -119,6 +119,7 @@ export default function FlowCanvas({
         direction: "a->b",
         label: null,
         show_amount: true,
+        excluded: false, // <—
       });
 
       if (error) {
@@ -164,7 +165,7 @@ export default function FlowCanvas({
             position="top-right"
             zoomable
             pannable
-            className="!bg-transparent !border !border-white/10 !backdrop-blur-sm rounded-lg shadow-lg"
+            className="!bg-transparent !border !aborder-white/10 !backdrop-blur-sm rounded-lg shadow-lg"
             style={{ width: 160, height: 110 }}
             maskColor="rgba(10,10,10,0.55)"
             nodeStrokeColor={(n) => (n?.data as any)?.stroke || "#52525b"}
