@@ -73,6 +73,13 @@ export default function EdgeModal({
   nodes,
   refresh,
 }: Props) {
+  // local copy of edge for instant UI updates
+  const [localEdge, setLocalEdge] = useState(edge);
+
+  useEffect(() => {
+    setLocalEdge(edge); // resync when modal reopens or prop changes
+  }, [edge]);
+
   // edge meta
   const [type, setType] = useState<"Income" | "Traffic" | "Fuel">(
     (edge.type as any) || "Traffic"
@@ -355,10 +362,48 @@ export default function EdgeModal({
               <Dialog.Title className="text-xl font-semibold tracking-tight truncate">
                 Edit Link
               </Dialog.Title>
-              <div className="text-sm text-white/70 truncate">
-                <span className="font-medium">{aName}</span>
-                <span className="mx-2 text-white/50">→</span>
-                <span className="font-medium">{bName}</span>
+              <div className="text-sm text-white/70 flex items-center gap-2">
+                <select
+                  value={localEdge.source_id}
+                  onChange={async (e) => {
+                    const newSource = e.target.value;
+                    setLocalEdge((prev) => ({ ...prev, source_id: newSource })); // instant update
+                    await supabase
+                      .from("edges")
+                      .update({ source_id: newSource })
+                      .eq("id", edge.id);
+                    refresh();
+                  }}
+                  className="bg-transparent font-medium border-none outline-none"
+                >
+                  {nodes.map((n) => (
+                    <option key={n.id} value={n.id} className="bg-zinc-900">
+                      {n.name}
+                    </option>
+                  ))}
+                </select>
+
+                <span className="mx-1 text-white/50">→</span>
+
+                <select
+                  value={localEdge.target_id}
+                  onChange={async (e) => {
+                    const newTarget = e.target.value;
+                    setLocalEdge((prev) => ({ ...prev, target_id: newTarget })); // instant update
+                    await supabase
+                      .from("edges")
+                      .update({ target_id: newTarget })
+                      .eq("id", edge.id);
+                    refresh();
+                  }}
+                  className="bg-transparent font-medium border-none outline-none"
+                >
+                  {nodes.map((n) => (
+                    <option key={n.id} value={n.id} className="bg-zinc-900">
+                      {n.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -455,9 +500,49 @@ export default function EdgeModal({
                       inputMode="decimal"
                       placeholder="Amount"
                       value={newAmount}
-                      onChange={(e) => setNewAmount(e.target.value)}
+                      onChange={(e) => {
+                        let val = e.target.value;
+
+                        // Allow only digits and one dot
+                        if (!/^\d*\.?\d*$/.test(val)) return;
+
+                        // Remove leading zeros unless "0." case
+                        if (
+                          val.startsWith("0") &&
+                          !val.startsWith("0.") &&
+                          val !== ""
+                        ) {
+                          val = String(parseFloat(val)); // normalize "00012" → "12"
+                        }
+
+                        // Limit to two decimals
+                        if (val.includes(".")) {
+                          const [intPart, decPart] = val.split(".");
+                          if (decPart.length > 2) return;
+                        }
+
+                        // Enforce max 100,000,000
+                        const num = parseFloat(val);
+                        if (!isNaN(num) && num > 100_000_000) return;
+
+                        setNewAmount(val);
+                      }}
+                      onBlur={() => {
+                        if (newAmount === "") return;
+                        const num = parseFloat(newAmount);
+
+                        // Block NaN or zero values
+                        if (isNaN(num) || num === 0) {
+                          setNewAmount("");
+                          return;
+                        }
+
+                        // Always round to 2 decimals
+                        setNewAmount(num.toFixed(2));
+                      }}
                       className="h-10 flex-1"
                     />
+
                     {(() => {
                       const baseCurrencies: string[] = [
                         "TWD",
