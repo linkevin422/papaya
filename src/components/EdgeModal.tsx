@@ -42,6 +42,7 @@ type Entry = {
   original_amount?: number;
   original_currency?: string;
   converted_amount?: number;
+  recurring_interval?: "daily" | "monthly" | "yearly" | null; // ✅ new
 };
 
 type EdgeRecurring = {
@@ -118,6 +119,12 @@ export default function EdgeModal({
   );
   const [newNote, setNewNote] = useState<string>("");
 
+  // recurring entry state
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurringInterval, setRecurringInterval] = useState<
+    "daily" | "monthly" | "yearly"
+  >("monthly");
+
   // profile master currency
   const [masterCurrency, setMasterCurrency] = useState<string>("TWD");
 
@@ -150,15 +157,26 @@ export default function EdgeModal({
       const { data: userData } = await supabase.auth.getUser();
       const id = userData.user?.id;
       if (!id) return;
-      const { data } = await supabase
-        .from("profiles")
-        .select("master_currency")
-        .eq("id", id)
-        .single();
-      if (data?.master_currency) {
-        setMasterCurrency(data.master_currency);
-        setNewCurrency(data.master_currency);
-      }
+      // load profile master currency
+      // load profile master currency
+      useEffect(() => {
+        (async () => {
+          const { data: userData } = await supabase.auth.getUser();
+          const id = userData.user?.id;
+          if (!id) return;
+
+          const { data } = await supabase
+            .from("profiles")
+            .select("master_currency")
+            .eq("id", id)
+            .single();
+
+          if (data?.master_currency) {
+            setMasterCurrency(data.master_currency);
+            setNewCurrency(data.master_currency);
+          }
+        })();
+      }, []);
     })();
   }, []);
 
@@ -195,7 +213,9 @@ export default function EdgeModal({
 
     const { data } = await supabase
       .from("edge_entries")
-      .select("amount, original_amount, original_currency, entry_date")
+      .select(
+        "amount, original_amount, original_currency, entry_date, recurring_interval"
+      )
       .eq("edge_id", edge.id);
 
     const rows = data || [];
@@ -210,6 +230,7 @@ export default function EdgeModal({
       ),
       currency: masterCurrency,
       date: e.entry_date,
+      recurring_interval: e.recurring_interval, // ✅ pass through
     }));
 
     const totals = calculateFlows(normalized, masterCurrency, r);
@@ -262,6 +283,7 @@ export default function EdgeModal({
       p_original_amount: amt,
       p_original_currency: newCurrency,
       p_note: newNote.trim() || null,
+      p_recurring_interval: isRecurring ? recurringInterval : null,
     });
 
     if (error) {
@@ -269,8 +291,27 @@ export default function EdgeModal({
       return;
     }
 
+    // if recurring was checked, insert rule
+    if (isRecurring) {
+      const { error: recErr } = await supabase
+        .from("recurring_entries")
+        .insert({
+          edge_id: edge.id,
+          user_id: userId,
+          amount: amt,
+          currency: newCurrency,
+          interval: recurringInterval,
+          note: newNote.trim() || null,
+        });
+
+      if (recErr) {
+        console.error("Failed to insert recurring entry:", recErr);
+      }
+    }
+
     setNewAmount("");
     setNewNote("");
+    setIsRecurring(false);
     await loadEntries();
     await loadRecurring();
     await refresh();
@@ -599,6 +640,34 @@ export default function EdgeModal({
                     <PlusCircle className="h-4 w-4" />
                     Add
                   </button>
+
+                  {/* Recurring toggle */}
+                  <div className="flex items-center gap-2 mt-2">
+                    <label className="flex items-center gap-2 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={isRecurring}
+                        onChange={(e) => setIsRecurring(e.target.checked)}
+                      />
+                      Make recurring
+                    </label>
+
+                    {isRecurring && (
+                      <select
+                        value={recurringInterval}
+                        onChange={(e) =>
+                          setRecurringInterval(
+                            e.target.value as "daily" | "monthly" | "yearly"
+                          )
+                        }
+                        className="rounded-md bg-zinc-900 border border-white/10 px-2 py-1 text-xs"
+                      >
+                        <option value="daily">Daily</option>
+                        <option value="monthly">Monthly</option>
+                        <option value="yearly">Yearly</option>
+                      </select>
+                    )}
+                  </div>
                 </div>
 
                 {/* Entries toolbar */}
@@ -698,7 +767,14 @@ export default function EdgeModal({
                             }}
                           />
                           <div className="text-sm">
-                            <div className="font-medium">{en.entry_date}</div>
+                            <div className="font-medium flex items-center gap-2">
+                              {en.entry_date}
+                              {en.recurring_interval && (
+                                <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emerald-900/30 border border-emerald-500/30 text-emerald-300">
+                                  🔁 {en.recurring_interval}
+                                </span>
+                              )}
+                            </div>
                             <div className="text-white/70">
                               {en.note || (
                                 <span className="italic text-white/50">

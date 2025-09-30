@@ -180,7 +180,9 @@ export default function FlowPage() {
     const ids = baseEdges.map((e) => e.id);
     const { data: entries } = await supabase
       .from("edge_entries")
-      .select("amount, original_amount, original_currency, edge_id, entry_date")
+      .select(
+        "amount, original_amount, original_currency, edge_id, entry_date, recurring_interval"
+      )
       .in("edge_id", ids);
 
     if (!entries) {
@@ -193,10 +195,7 @@ export default function FlowPage() {
     if (!rates.USD) rates.USD = 1;
 
     // 4) Group raw entries
-    const grouped = new Map<
-      string,
-      { amount: number; currency: string; date: string }[]
-    >();
+    const grouped = new Map<string, Entry[]>();
     for (const row of entries) {
       const srcAmt = (row as any).original_amount ?? row.amount;
       const srcCur = row.original_currency || masterCurrency;
@@ -205,6 +204,7 @@ export default function FlowPage() {
         amount: srcAmt,
         currency: srcCur,
         date: row.entry_date || "unknown",
+        recurring_interval: row.recurring_interval || null,
       });
     }
 
@@ -222,6 +222,7 @@ export default function FlowPage() {
         ),
         currency: masterCurrency,
         date: entry.date,
+        recurring_interval: entry.recurring_interval, // ✅ keep it
       }));
 
       const flows =
