@@ -93,13 +93,13 @@ export default function FlowCanvas({
     async (connection: Connection) => {
       if (!connection.source || !connection.target) return;
 
-      const newId = `${connection.source}-${connection.target}-${Date.now()}`;
+      const tempId = `temp-${Date.now()}`; // only for ReactFlow temporary edge
       const type = "Traffic";
       const strokeColor = EDGE_COLOR.Traffic || "#e5e7eb";
 
-      // Optimistic edge
+      // Optimistic edge with temp id
       const newEdge: Edge = decorateEdge({
-        id: newId,
+        id: tempId,
         source: connection.source,
         target: connection.target,
         markerEnd: { type: MarkerType.ArrowClosed, color: strokeColor },
@@ -109,9 +109,8 @@ export default function FlowCanvas({
       });
       setEdgesState((eds) => addEdge(newEdge, eds));
 
-      // Insert into DB
+      // Insert into DB → Postgres auto-generates UUID
       const { error } = await supabase.from("edges").insert({
-        id: newId,
         flow_id: flowId,
         source_id: connection.source,
         target_id: connection.target,
@@ -119,12 +118,12 @@ export default function FlowCanvas({
         direction: "a->b",
         label: null,
         show_amount: true,
-        excluded: false, // <—
+        excluded: false,
       });
 
       if (error) {
         console.error("Edge insert failed:", error);
-        setEdgesState((eds) => eds.filter((e) => e.id !== newId));
+        setEdgesState((eds) => eds.filter((e) => e.id !== tempId));
         return;
       }
 

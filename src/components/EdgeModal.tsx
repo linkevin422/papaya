@@ -238,18 +238,22 @@ export default function EdgeModal({
 
     // Take only the left side before "≈", if present
     let amtStr = newAmount.split("≈")[0].trim();
-    // Strip currency symbols/letters, keep digits and dot
     amtStr = amtStr.replace(/[A-Za-z$€£¥₩]/g, "").trim();
-    // Normalize commas to dot and strip everything else
     amtStr = amtStr.replace(/,/g, ".").replace(/[^\d.]/g, "");
 
     const amt = Number(amtStr);
     if (!newDate || !amtStr || Number.isNaN(amt)) return;
 
     const { data: userData, error: userErr } = await supabase.auth.getUser();
-    if (userErr) return;
+    if (userErr) {
+      console.error("Auth error:", userErr);
+      return;
+    }
     const userId = userData.user?.id;
-    if (!userId) return;
+    if (!userId) {
+      console.error("No user ID found");
+      return;
+    }
 
     const { error } = await supabase.rpc("add_edge_entry", {
       p_user_id: userId,
@@ -259,7 +263,11 @@ export default function EdgeModal({
       p_original_currency: newCurrency,
       p_note: newNote.trim() || null,
     });
-    if (error) return;
+
+    if (error) {
+      console.error("add_edge_entry failed:", error);
+      return;
+    }
 
     setNewAmount("");
     setNewNote("");

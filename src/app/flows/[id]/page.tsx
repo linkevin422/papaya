@@ -519,68 +519,42 @@ export default function FlowPage() {
   // EDGES with amounts
   const rfEdges = useMemo(() => {
     return edges.map((e) => {
+      // ✅ use precomputed flows
+      const val =
+        viewMode === "daily"
+          ? e.daily_flow
+          : viewMode === "monthly"
+          ? e.monthly_flow
+          : e.yearly_flow;
+
       const dir = normalizeDir(e.direction || undefined);
       const isBoth = dir === "both";
       const isNone = dir === "none";
-      const isExcluded = (e as any).excluded === true;
+      const isExcluded = e.excluded === true;
 
       const stroke = isExcluded
         ? "#ef4444"
         : EDGE_COLOR[normalizeType(e.type)] || "#e5e7eb";
 
-      // fallback rate map
-      const r = { ...rates };
-      const masterCurrency = profile?.master_currency || "USD";
-      if (!r["USD"]) r["USD"] = 1;
-      if (!r[masterCurrency]) r[masterCurrency] = 1;
-
-      const entries =
-        ((e as any).entries as {
-          amount: number;
-          currency: string;
-          date: string;
-        }[]) || [];
-
-      const normalized = entries.map((entry) => ({
-        amount: convertAmount(entry.amount, entry.currency, masterCurrency, r),
-        currency: masterCurrency,
-        date: entry.date,
-      }));
-
-      const flows = calculateFlows(normalized, masterCurrency, r);
-
-      const val =
-        viewMode === "daily"
-          ? flows.daily
-          : viewMode === "monthly"
-          ? flows.monthly
-          : flows.yearly;
-
       const shouldShow =
         e.show_amount !== false && showAmountsForViewer && !isExcluded;
-      const hasEnough = entries.length >= 2;
+      const hasEnough = (e.entries_count ?? 0) >= 1;
 
       let amountText: string | null = null;
       if (shouldShow && hasEnough && typeof val === "number" && isFinite(val)) {
         const suffix =
           viewMode === "daily" ? "/d" : viewMode === "monthly" ? "/mo" : "/yr";
-        amountText = `${fmtCurrency(val, masterCurrency)} ${suffix}`;
+        amountText = `${fmtCurrency(
+          val,
+          profile?.master_currency || "USD"
+        )} ${suffix}`;
       }
-
-      const finalLabel =
-        amountText && e.label
-          ? `${e.label} • ${amountText}`
-          : amountText || e.label || undefined;
-
-      const style = isNone
-        ? { stroke, strokeDasharray: "6 6", strokeWidth: 2 }
-        : { stroke, strokeWidth: 2 };
 
       return {
         id: e.id,
         source: e.source_id,
         target: e.target_id,
-        label: hasEnough ? finalLabel : undefined,
+        label: amountText || e.label || undefined,
         animated: !isBoth && !isNone,
         markerStart: isBoth
           ? { type: MarkerType.ArrowClosed, color: stroke }
@@ -588,7 +562,9 @@ export default function FlowPage() {
         markerEnd: isNone
           ? undefined
           : { type: MarkerType.ArrowClosed, color: stroke },
-        style,
+        style: isNone
+          ? { stroke, strokeDasharray: "6 6", strokeWidth: 2 }
+          : { stroke, strokeWidth: 2 },
         data: {
           direction: dir,
           linkType: e.type,
@@ -596,7 +572,15 @@ export default function FlowPage() {
         },
       };
     });
-  }, [edges, viewMode, showAmountsForViewer, profile?.master_currency]);
+  }, [
+    edges,
+    viewMode,
+    showAmountsForViewer,
+    profile?.master_currency,
+    daily,
+    monthly,
+    yearly,
+  ]);
 
   if (notFound) {
     return (
