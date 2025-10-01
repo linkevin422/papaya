@@ -67,7 +67,7 @@
     "about": "About",
 "my_flow": "My Flow",
 "pricing": "Pricing",
-"docs": "Docs",
+"guide": "Guide",
 
 "display_name": "Display Name",
 "handle_hint": "3–20 chars. Only letters, numbers, underscores, or dashes.",
@@ -127,10 +127,22 @@
   "pricing_upgrade_yearly": "Upgrade – Yearly",
   "pricing_thanks": "Thanks for supporting Papaya.",
 
-  "about_title": "About Papaya",
-  "about_mission": "Papaya helps creators and entrepreneurs see their work clearly. One map, one flow, less noise, more growth.",
-
-    "overview": "Overview",
+"about_title": "About Papaya",
+  "about_mission": "Most people are taught to chase one job, one paycheck, and spend it all. The future will not be built on a single stream. It will be built on many. Small drips join into rivers, rivers feed into an ecosystem, and the ecosystem becomes your empire. Papaya exists to make those flows visible, so you can see the system you have built and be proud of it.",
+  "about_story_title": "Story",
+  "about_story": "Papaya was born from the frustration of tracking multiple income sources across scattered platforms. Salaries shrink, costs rise, and yet the answer is not endless jobs. The answer is to create streams that flow together. Passive and semi-passive income, small but steady, combining into something greater. Papaya takes the messy map in your head and turns it into a clear visual language.",
+  "about_values_title": "Values",
+  "about_values": [
+    "Papaya believes in clarity. Numbers should not be buried in spreadsheets. They should tell a story you can follow.",
+    "Papaya believes in creativity. Your empire is not a budget, it is an ecosystem you designed yourself.",
+    "Papaya believes in independence. The tool adapts to you, not the other way around."
+  ],
+  "about_what_title": "What Papaya Is",
+  "about_what": "Papaya is a flow tracker for entrepreneurs and creators. Add nodes like banks, apps, or revenue streams. Connect them with links like income, traffic, or fuel. Watch as your daily, monthly, and yearly totals are calculated and laid out in a living map. It is not corporate accounting. It is a creative system that shows you who you are and what you have built.",
+  "about_community_title": "Community",
+  "about_community": "Papaya is made for people who refuse to depend on one paycheck. Indie creators, freelancers, builders, and small business owners who see their work as an ecosystem. People who want to look at their empire and feel pride.",
+  "about_vision_title": "Vision",
+  "about_vision": "Papaya begins with money and traffic flows. In the future, it could expand to map time, energy, or attention. The canvas is open. One day Papaya may even advise and predict, but for now the mission is simple. Make the invisible visible. Give entrepreneurs a clear picture of their ecosystem and their empire.",   
 
     "flowpage_notFound": "This flow is private or does not exist.",
     "flowpage_rename": "Rename flow",

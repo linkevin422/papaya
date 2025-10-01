@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { Dialog } from "@headlessui/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,7 +71,7 @@ export default function NodeModal({ open, onClose, node, refresh }: Props) {
   const valid = name.trim().length > 0;
 
   // actions
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (!valid || saving) return;
     setSaving(true);
     await supabase
@@ -81,7 +81,7 @@ export default function NodeModal({ open, onClose, node, refresh }: Props) {
     setSaving(false);
     await refresh();
     onClose();
-  };
+  }, [valid, saving, name, type, node.id, refresh, onClose]);
 
   const tryDelete = () => setConfirmDeleteOpen(true);
 
@@ -102,7 +102,7 @@ export default function NodeModal({ open, onClose, node, refresh }: Props) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose, name, type]);
+  }, [open, onClose, handleSave]);
 
   const CurrentIcon =
     NODE_TYPES.find((t) => t.value === type)?.icon || HelpCircle;

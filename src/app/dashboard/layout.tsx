@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import { useLanguage } from "@/context/LanguageProvider";
 
 export default function DashboardLayout({
@@ -15,18 +16,18 @@ export default function DashboardLayout({
       {/* Sidebar (desktop only) */}
       <aside className="hidden md:block border-r border-neutral-800 p-4">
         <nav className="space-y-2">
-          <a
+          <Link
             href="/dashboard"
             className="block rounded-lg px-3 py-2 hover:bg-neutral-900"
           >
             {t("overview")}
-          </a>
-          <a
+          </Link>
+          <Link
             href="/dashboard/settings"
             className="block rounded-lg px-3 py-2 hover:bg-neutral-900"
           >
             {t("settings")}
-          </a>
+          </Link>
         </nav>
       </aside>
 

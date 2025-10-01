@@ -51,6 +51,12 @@ export default function Header() {
             {t("about")}
           </Link>
           <Link
+            href="/docs/flows"
+            className="text-sm opacity-80 hover:opacity-100"
+          >
+            {t("guide")}
+          </Link>
+          <Link
             href={profile ? `/${profile.handle}` : "/login"}
             className="text-sm opacity-80 hover:opacity-100"
           >
@@ -61,12 +67,6 @@ export default function Header() {
             className="text-sm opacity-80 hover:opacity-100"
           >
             {t("pricing")}
-          </Link>
-          <Link
-            href="/docs/flows"
-            className="text-sm opacity-80 hover:opacity-100"
-          >
-            {t("docs")}
           </Link>
         </nav>
 
