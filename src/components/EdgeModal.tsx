@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase";
 import { Trash2, PlusCircle, AlertTriangle } from "lucide-react";
 import { convertAmount, calculateFlows } from "@/lib/math";
 import { getLatestRates } from "@/lib/rates";
+import { useLanguage } from "@/context/LanguageProvider";
 
 type Props = {
   open: boolean;
@@ -74,6 +75,8 @@ export default function EdgeModal({
   nodes,
   refresh,
 }: Props) {
+  const { t } = useLanguage();
+
   // local copy of edge for instant UI updates
   const [localEdge, setLocalEdge] = useState(edge);
 
@@ -136,7 +139,7 @@ export default function EdgeModal({
   } | null>(null);
 
   const nameOf = (id: string) =>
-    nodes.find((n) => n.id === id)?.name || "Unknown";
+    nodes.find((n) => n.id === id)?.name || t("edgemodal_unknown");
   const aName = useMemo(() => nameOf(edge.source_id), [edge.source_id, nodes]);
   const bName = useMemo(() => nameOf(edge.target_id), [edge.target_id, nodes]);
 
@@ -144,9 +147,8 @@ export default function EdgeModal({
 
   // ----- helpers -----
   const effectiveRates = useCallback(() => {
-    // Do NOT override existing values. Just ensure essentials exist.
     const r = { ...rates };
-    if (!r["USD"]) r["USD"] = 1; // most tables are normalized to USD
+    if (!r["USD"]) r["USD"] = 1;
     if (!r[masterCurrency]) r[masterCurrency] = r[masterCurrency] ?? 1;
     return r;
   }, [rates, masterCurrency]);
@@ -157,26 +159,17 @@ export default function EdgeModal({
       const { data: userData } = await supabase.auth.getUser();
       const id = userData.user?.id;
       if (!id) return;
-      // load profile master currency
-      // load profile master currency
-      useEffect(() => {
-        (async () => {
-          const { data: userData } = await supabase.auth.getUser();
-          const id = userData.user?.id;
-          if (!id) return;
 
-          const { data } = await supabase
-            .from("profiles")
-            .select("master_currency")
-            .eq("id", id)
-            .single();
+      const { data } = await supabase
+        .from("profiles")
+        .select("master_currency")
+        .eq("id", id)
+        .single();
 
-          if (data?.master_currency) {
-            setMasterCurrency(data.master_currency);
-            setNewCurrency(data.master_currency);
-          }
-        })();
-      }, []);
+      if (data?.master_currency) {
+        setMasterCurrency(data.master_currency);
+        setNewCurrency(data.master_currency);
+      }
     })();
   }, []);
 
@@ -230,7 +223,7 @@ export default function EdgeModal({
       ),
       currency: masterCurrency,
       date: e.entry_date,
-      recurring_interval: e.recurring_interval, // ✅ pass through
+      recurring_interval: e.recurring_interval,
     }));
 
     const totals = calculateFlows(normalized, masterCurrency, r);
@@ -238,7 +231,6 @@ export default function EdgeModal({
 
     setLoadingRecurring(false);
   }, [edge.id, masterCurrency, effectiveRates]);
-
   // open → load entries; once entries + rates + masterCurrency are all ready → compute flows
   useEffect(() => {
     if (open && edge.id) loadEntries();
@@ -257,7 +249,6 @@ export default function EdgeModal({
   const addEntry = async () => {
     if (type === "Traffic") return;
 
-    // Take only the left side before "≈", if present
     let amtStr = newAmount.split("≈")[0].trim();
     amtStr = amtStr.replace(/[A-Za-z$€£¥₩]/g, "").trim();
     amtStr = amtStr.replace(/,/g, ".").replace(/[^\d.]/g, "");
@@ -291,7 +282,6 @@ export default function EdgeModal({
       return;
     }
 
-    // if recurring was checked, insert rule
     if (isRecurring) {
       const { error: recErr } = await supabase
         .from("recurring_entries")
@@ -367,7 +357,7 @@ export default function EdgeModal({
   };
 
   const fmtMoney = (n: number | null | undefined, cur?: string) =>
-    typeof n === "number" ? `${cur || ""} ${n.toFixed(2)}` : "N/A";
+    typeof n === "number" ? `${cur || ""} ${n.toFixed(2)}` : t("edgemodal_na");
 
   const formatCurrency = (amt: number | null | undefined, cur: string) =>
     typeof amt === "number"
@@ -377,7 +367,7 @@ export default function EdgeModal({
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
         }).format(amt)
-      : "N/A";
+      : t("edgemodal_na");
 
   const sortedFiltered = useMemo(() => {
     const filtered = filterText
@@ -409,14 +399,14 @@ export default function EdgeModal({
           <div className="flex items-start justify-between p-6 border-b border-white/10">
             <div className="min-w-0">
               <Dialog.Title className="text-xl font-semibold tracking-tight truncate">
-                Edit Link
+                {t("edgemodal_edit_link")}
               </Dialog.Title>
               <div className="text-sm text-white/70 flex items-center gap-2">
                 <select
                   value={localEdge.source_id}
                   onChange={async (e) => {
                     const newSource = e.target.value;
-                    setLocalEdge((prev) => ({ ...prev, source_id: newSource })); // instant update
+                    setLocalEdge((prev) => ({ ...prev, source_id: newSource }));
                     await supabase
                       .from("edges")
                       .update({ source_id: newSource })
@@ -438,7 +428,7 @@ export default function EdgeModal({
                   value={localEdge.target_id}
                   onChange={async (e) => {
                     const newTarget = e.target.value;
-                    setLocalEdge((prev) => ({ ...prev, target_id: newTarget })); // instant update
+                    setLocalEdge((prev) => ({ ...prev, target_id: newTarget }));
                     await supabase
                       .from("edges")
                       .update({ target_id: newTarget })
@@ -466,19 +456,19 @@ export default function EdgeModal({
                   setConfirmingSwitchType(next);
                 }}
                 className="h-9 rounded-md bg-black/40 border border-white/15 px-2 text-sm"
-                title="Switch type"
+                title={t("edgemodal_switch_type")}
               >
-                <option value="Income">Income</option>
-                <option value="Traffic">Traffic</option>
-                <option value="Fuel">Fuel</option>
+                <option value="Income">{t("edgemodal_income")}</option>
+                <option value="Traffic">{t("edgemodal_traffic")}</option>
+                <option value="Fuel">{t("edgemodal_fuel")}</option>
               </select>
 
               <button
                 onClick={() => setConfirmingDeleteEdge(true)}
                 className="h-9 rounded-md border border-red-500/30 px-3 text-sm text-red-300 hover:bg-red-500/10"
-                title="Delete link and all its data"
+                title={t("edgemodal_delete_link_title")}
               >
-                Delete Link
+                {t("edgemodal_delete_link")}
               </button>
             </div>
           </div>
@@ -502,7 +492,7 @@ export default function EdgeModal({
                     }}
                     className="accent-red-500"
                   />
-                  Exclude from totals
+                  {t("edgemodal_exclude_from_totals")}
                 </label>
 
                 <label className="ml-auto inline-flex items-center gap-2 text-xs">
@@ -519,18 +509,19 @@ export default function EdgeModal({
                     }}
                     className="accent-white"
                   />
-                  Show amount on edge
+                  {t("edgemodal_show_amount")}
                 </label>
               </div>
             )}
-
             {/* TYPE == Traffic notice */}
             {type === "Traffic" ? (
               <div className="rounded-lg border border-white/10 bg-white/5 p-4">
                 <div className="text-sm text-white/80">
-                  This link is marked as{" "}
-                  <span className="font-semibold">Traffic</span>. It carries no
-                  money entries.
+                  {t("edgemodal_traffic_notice")}{" "}
+                  <span className="font-semibold">
+                    {t("edgemodal_traffic")}
+                  </span>
+                  . {t("edgemodal_no_money_entries")}
                 </div>
               </div>
             ) : (
@@ -547,46 +538,34 @@ export default function EdgeModal({
                     <Input
                       type="text"
                       inputMode="decimal"
-                      placeholder="Amount"
+                      placeholder={t("edgemodal_amount")}
                       value={newAmount}
                       onChange={(e) => {
                         let val = e.target.value;
 
-                        // Allow only digits and one dot
                         if (!/^\d*\.?\d*$/.test(val)) return;
-
-                        // Remove leading zeros unless "0." case
                         if (
                           val.startsWith("0") &&
                           !val.startsWith("0.") &&
                           val !== ""
                         ) {
-                          val = String(parseFloat(val)); // normalize "00012" → "12"
+                          val = String(parseFloat(val));
                         }
-
-                        // Limit to two decimals
                         if (val.includes(".")) {
                           const [intPart, decPart] = val.split(".");
                           if (decPart.length > 2) return;
                         }
-
-                        // Enforce max 100,000,000
                         const num = parseFloat(val);
                         if (!isNaN(num) && num > 100_000_000) return;
-
                         setNewAmount(val);
                       }}
                       onBlur={() => {
                         if (newAmount === "") return;
                         const num = parseFloat(newAmount);
-
-                        // Block NaN or zero values
                         if (isNaN(num) || num === 0) {
                           setNewAmount("");
                           return;
                         }
-
-                        // Always round to 2 decimals
                         setNewAmount(num.toFixed(2));
                       }}
                       className="h-10 flex-1"
@@ -622,7 +601,7 @@ export default function EdgeModal({
                     })()}
                   </div>
                   <Input
-                    placeholder="Note (optional)"
+                    placeholder={t("edgemodal_note_optional")}
                     value={newNote}
                     onChange={(e) => setNewNote(e.target.value)}
                     className="h-10"
@@ -638,34 +617,39 @@ export default function EdgeModal({
                     )}
                   >
                     <PlusCircle className="h-4 w-4" />
-                    Add
+                    {t("edgemodal_add")}
                   </button>
 
                   {/* Recurring toggle */}
-                  <div className="flex items-center gap-2 mt-2">
-                    <label className="flex items-center gap-2 text-xs">
-                      <input
-                        type="checkbox"
-                        checked={isRecurring}
-                        onChange={(e) => setIsRecurring(e.target.checked)}
-                      />
-                      Make recurring
-                    </label>
-
-                    {isRecurring && (
-                      <select
-                        value={recurringInterval}
-                        onChange={(e) =>
-                          setRecurringInterval(
-                            e.target.value as "daily" | "monthly" | "yearly"
-                          )
-                        }
-                        className="rounded-md bg-zinc-900 border border-white/10 px-2 py-1 text-xs"
-                      >
-                        <option value="daily">Daily</option>
-                        <option value="monthly">Monthly</option>
-                        <option value="yearly">Yearly</option>
-                      </select>
+                  <div className="flex items-center gap-2 text-xs">
+                    <input
+                      type="checkbox"
+                      checked={isRecurring}
+                      onChange={(e) => setIsRecurring(e.target.checked)}
+                    />
+                    {isRecurring ? (
+                      <>
+                        <span>{t("edgemodal_recurring")}</span>
+                        <select
+                          value={recurringInterval}
+                          onChange={(e) =>
+                            setRecurringInterval(
+                              e.target.value as "daily" | "monthly" | "yearly"
+                            )
+                          }
+                          className="rounded-md bg-zinc-900 border border-white/10 px-2 py-1 text-xs"
+                        >
+                          <option value="daily">{t("edgemodal_daily")}</option>
+                          <option value="monthly">
+                            {t("edgemodal_monthly")}
+                          </option>
+                          <option value="yearly">
+                            {t("edgemodal_yearly")}
+                          </option>
+                        </select>
+                      </>
+                    ) : (
+                      <span>{t("edgemodal_make_recurring")}</span>
                     )}
                   </div>
                 </div>
@@ -687,7 +671,7 @@ export default function EdgeModal({
                           }
                         }}
                       />
-                      Select all on page
+                      {t("edgemodal_select_all_on_page")}
                     </label>
 
                     {selectedIds.size > 0 && (
@@ -695,14 +679,16 @@ export default function EdgeModal({
                         onClick={bulkDeleteEntries}
                         className="bg-red-600 hover:bg-red-700 text-white h-8 px-3 text-xs"
                       >
-                        Delete {selectedIds.size} selected
+                        {t("edgemodal_delete_selected", {
+                          count: String(selectedIds.size),
+                        })}
                       </Button>
                     )}
                   </div>
 
                   <div className="flex items-center gap-2">
                     <Input
-                      placeholder="Filter notes…"
+                      placeholder={t("edgemodal_filter_notes")}
                       value={filterText}
                       onChange={(e) => setFilterText(e.target.value)}
                       className="h-8 w-40"
@@ -710,7 +696,11 @@ export default function EdgeModal({
                     <button
                       onClick={() => setSortAsc((s) => !s)}
                       className="h-8 w-8 flex items-center justify-center rounded-md border border-white/15 hover:bg-white/10"
-                      title={sortAsc ? "Oldest first" : "Newest first"}
+                      title={
+                        sortAsc
+                          ? t("edgemodal_oldest_first")
+                          : t("edgemodal_newest_first")
+                      }
                     >
                       {sortAsc ? (
                         <svg
@@ -748,7 +738,9 @@ export default function EdgeModal({
                 {/* Entries list */}
                 <div className="relative divide-y divide-white/5">
                   {sortedFiltered.length === 0 ? (
-                    <div className="p-4 text-sm text-white/70">No entries.</div>
+                    <div className="p-4 text-sm text-white/70">
+                      {t("edgemodal_no_entries")}
+                    </div>
                   ) : (
                     sortedFiltered.map((en) => (
                       <div
@@ -770,15 +762,15 @@ export default function EdgeModal({
                             <div className="font-medium flex items-center gap-2">
                               {en.entry_date}
                               {en.recurring_interval && (
-                                <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emerald-900/30 border border-emerald-500/30 text-emerald-300">
-                                  🔁 {en.recurring_interval}
+                                <span className="inline-flex items-center text-xs px-2 py-0.5 rounded-full bg-emerald-900/30 border border-emerald-500/30 text-emerald-300">
+                                  {t(`edgemodal_${en.recurring_interval}`)}
                                 </span>
                               )}
                             </div>
                             <div className="text-white/70">
                               {en.note || (
                                 <span className="italic text-white/50">
-                                  No note
+                                  {t("edgemodal_no_note")}
                                 </span>
                               )}
                             </div>
@@ -796,12 +788,11 @@ export default function EdgeModal({
                                   en.original_currency
                                 )}
 
-                            {/* show ≈ in master currency ONLY if different currency */}
                             {(() => {
                               const r = effectiveRates();
                               const src =
                                 en.original_currency || masterCurrency;
-                              if (!src || src === masterCurrency) return ""; // skip if same currency
+                              if (!src || src === masterCurrency) return "";
                               const conv = convertAmount(
                                 en.original_amount ?? en.amount,
                                 src,
@@ -819,7 +810,7 @@ export default function EdgeModal({
                           <button
                             onClick={() => deleteEntry(en.id)}
                             className="inline-flex items-center text-red-400 hover:text-red-300"
-                            title="Delete entry"
+                            title={t("edgemodal_delete_entry")}
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -829,7 +820,7 @@ export default function EdgeModal({
                   )}
                   {loadingEntries && (
                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center text-sm text-white/70">
-                      Refreshing…
+                      {t("edgemodal_refreshing")}
                     </div>
                   )}
                 </div>
@@ -842,23 +833,25 @@ export default function EdgeModal({
                 {flows ? (
                   <div className="space-y-1">
                     <div>
-                      Daily: {formatCurrency(flows.daily, masterCurrency)}
+                      {t("edgemodal_daily")}:{" "}
+                      {formatCurrency(flows.daily, masterCurrency)}
                     </div>
                     <div>
-                      Monthly: {formatCurrency(flows.monthly, masterCurrency)}
+                      {t("edgemodal_monthly")}:{" "}
+                      {formatCurrency(flows.monthly, masterCurrency)}
                     </div>
                     <div>
-                      Yearly: {formatCurrency(flows.yearly, masterCurrency)}
+                      {t("edgemodal_yearly")}:{" "}
+                      {formatCurrency(flows.yearly, masterCurrency)}
                     </div>
                   </div>
                 ) : (
                   <div className="italic text-white/60">
-                    No flow data available.
+                    {t("edgemodal_no_flow_data")}
                   </div>
                 )}
               </div>
             )}
-
             {/* Confirm switch type */}
             {confirmingSwitchType && (
               <div className="rounded-lg border border-amber-400/30 bg-amber-900/30 p-4 text-amber-100">
@@ -866,26 +859,27 @@ export default function EdgeModal({
                   <AlertTriangle className="h-5 w-5 flex-none" />
                   <div>
                     <p className="font-semibold">
-                      Switch link type to {confirmingSwitchType}?
+                      {t("edgemodal_switch_link_type", {
+                        type: confirmingSwitchType,
+                      })}
                     </p>
                     <p className="mt-1 text-sm">
-                      Switching between Income and Traffic will change how this
-                      link behaves.
+                      {t("edgemodal_switch_notice")}
                       {confirmingSwitchType === "Traffic" &&
-                        " Moving to Traffic will delete all existing entries on this link."}
+                        t("edgemodal_switch_delete_warning")}
                     </p>
                     <div className="mt-3 flex gap-2">
                       <Button
                         onClick={() => performSwitchType(confirmingSwitchType)}
                         className="bg-amber-600 hover:bg-amber-700 text-white"
                       >
-                        Confirm switch
+                        {t("edgemodal_confirm_switch")}
                       </Button>
                       <Button
                         onClick={() => setConfirmingSwitchType(null)}
                         className="border border-white/15 bg-transparent"
                       >
-                        Cancel
+                        {t("edgemodal_cancel")}
                       </Button>
                     </div>
                   </div>
@@ -899,24 +893,27 @@ export default function EdgeModal({
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="h-5 w-5 flex-none" />
                   <div>
-                    <p className="font-semibold">Delete this link?</p>
+                    <p className="font-semibold">
+                      {t("edgemodal_delete_link")}
+                    </p>
                     <p className="mt-1 text-sm">
-                      This will permanently delete {entries.length} entr
-                      {entries.length === 1 ? "y" : "ies"} attached to this link
-                      and the link itself.
+                      {t("edgemodal_delete_notice", {
+                        count: String(entries.length),
+                        suffix: entries.length === 1 ? "y" : "ies",
+                      })}
                     </p>
                     <div className="mt-3 flex gap-2">
                       <Button
                         onClick={actuallyDeleteEdge}
                         className="bg-red-700 hover:bg-red-800 text-white"
                       >
-                        Confirm delete
+                        {t("edgemodal_confirm_delete")}
                       </Button>
                       <Button
                         onClick={() => setConfirmingDeleteEdge(false)}
                         className="border border-white/15 bg-transparent"
                       >
-                        Cancel
+                        {t("edgemodal_cancel")}
                       </Button>
                     </div>
                   </div>
@@ -930,13 +927,13 @@ export default function EdgeModal({
             <div className="flex items-center gap-2 text-xs text-white/60">
               {type !== "Traffic" ? (
                 <span>
-                  Master currency:{" "}
+                  {t("edgemodal_master_currency")}:{" "}
                   <span className="font-semibold text-white">
                     {masterCurrency}
                   </span>
                 </span>
               ) : (
-                <span>Traffic link, no monetary entries.</span>
+                <span>{t("edgemodal_traffic_no_entries")}</span>
               )}
             </div>
 
@@ -944,7 +941,7 @@ export default function EdgeModal({
               onClick={onClose}
               className="bg-transparent text-white hover:text-gray-300 px-4 py-2 rounded-md border border-white/10"
             >
-              Close
+              {t("edgemodal_close")}
             </button>
           </div>
         </Dialog.Panel>

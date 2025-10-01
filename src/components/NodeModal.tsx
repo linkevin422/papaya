@@ -1,109 +1,111 @@
-'use client'
+"use client";
 
-import { useEffect, useMemo, useState } from 'react'
-import { Dialog } from '@headlessui/react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { createClient } from '@/lib/supabase'
-import { Wallet, Globe, Users, Briefcase, HelpCircle } from 'lucide-react'
+import { useEffect, useMemo, useState } from "react";
+import { Dialog } from "@headlessui/react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { createClient } from "@/lib/supabase";
+import { Wallet, Globe, Users, Briefcase, HelpCircle } from "lucide-react";
+import { useLanguage } from "@/context/LanguageProvider";
 
 type Props = {
-  open: boolean
-  onClose: () => void
-  node: { id: string; name: string; type?: string | null }
-  refresh: () => void
-}
+  open: boolean;
+  onClose: () => void;
+  node: { id: string; name: string; type?: string | null };
+  refresh: () => void;
+};
 
 const NODE_TYPES = [
-  { value: 'Pocket', label: 'Pocket', icon: Wallet },
-  { value: 'Platform', label: 'Platform', icon: Globe },
-  { value: 'People', label: 'People', icon: Users },
-  { value: 'Portfolio', label: 'Portfolio', icon: Briefcase },
-  { value: 'Other', label: 'Other', icon: HelpCircle },
-]
+  { value: "Pocket", label: "Pocket", icon: Wallet },
+  { value: "Platform", label: "Platform", icon: Globe },
+  { value: "People", label: "People", icon: Users },
+  { value: "Portfolio", label: "Portfolio", icon: Briefcase },
+  { value: "Other", label: "Other", icon: HelpCircle },
+];
 
 const NODE_HINTS: Record<string, string> = {
-  Pocket: 'Cash, Bank Account, PayPal',
-  Platform: 'Shopee, YouTube, Stripe',
-  People: 'Employer, Client, Sponsor',
-  Portfolio: 'ETF, Crypto Wallet, Royalties',
-  Other: 'Anything else',
-}
+  Pocket: "Cash, Bank Account, PayPal",
+  Platform: "Shopee, YouTube, Stripe",
+  People: "Employer, Client, Sponsor",
+  Portfolio: "ETF, Crypto Wallet, Royalties",
+  Other: "Anything else",
+};
 
-const supabase = createClient()
+const supabase = createClient();
 
 export default function NodeModal({ open, onClose, node, refresh }: Props) {
-  const [name, setName] = useState(node.name)
-  const [type, setType] = useState<string>(node.type || 'Platform')
-  const [saving, setSaving] = useState(false)
+  const { t } = useLanguage();
+  const [name, setName] = useState(node.name);
+  const [type, setType] = useState<string>(node.type || "Platform");
+  const [saving, setSaving] = useState(false);
 
   // delete confirm
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
-  const [connectedCount, setConnectedCount] = useState<number | null>(null)
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [connectedCount, setConnectedCount] = useState<number | null>(null);
 
   useEffect(() => {
-    setName(node.name)
-    setType(node.type || 'Platform')
-  }, [node])
+    setName(node.name);
+    setType(node.type || "Platform");
+  }, [node]);
 
   useEffect(() => {
-    if (!open || !node.id) return
+    if (!open || !node.id) return;
     // fetch number of connected edges for delete warning
     const loadConnections = async () => {
       const { count } = await supabase
-        .from('edges')
-        .select('id', { count: 'exact', head: true })
-        .or(`source_id.eq.${node.id},target_id.eq.${node.id}`)
-      setConnectedCount(count ?? 0)
-    }
-    loadConnections()
-  }, [open, node.id])
+        .from("edges")
+        .select("id", { count: "exact", head: true })
+        .or(`source_id.eq.${node.id},target_id.eq.${node.id}`);
+      setConnectedCount(count ?? 0);
+    };
+    loadConnections();
+  }, [open, node.id]);
 
   // state
   const dirty = useMemo(
     () =>
-      name.trim() !== (node.name || '').trim() ||
-      (type || '') !== (node.type || 'Platform'),
+      name.trim() !== (node.name || "").trim() ||
+      (type || "") !== (node.type || "Platform"),
     [name, type, node.name, node.type]
-  )
-  const valid = name.trim().length > 0
+  );
+  const valid = name.trim().length > 0;
 
   // actions
   const handleSave = async () => {
-    if (!valid || saving) return
-    setSaving(true)
+    if (!valid || saving) return;
+    setSaving(true);
     await supabase
-      .from('nodes')
+      .from("nodes")
       .update({ name: name.trim(), type })
-      .eq('id', node.id)
-    setSaving(false)
-    await refresh()
-    onClose()
-  }
+      .eq("id", node.id);
+    setSaving(false);
+    await refresh();
+    onClose();
+  };
 
-  const tryDelete = () => setConfirmDeleteOpen(true)
+  const tryDelete = () => setConfirmDeleteOpen(true);
 
   const handleDeleteConfirmed = async () => {
-    await supabase.from('nodes').delete().eq('id', node.id)
-    setConfirmDeleteOpen(false)
-    await refresh()
-    onClose()
-  }
+    await supabase.from("nodes").delete().eq("id", node.id);
+    setConfirmDeleteOpen(false);
+    await refresh();
+    onClose();
+  };
 
   // keyboard shortcuts
   useEffect(() => {
-    if (!open) return
+    if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'enter')
-        handleSave()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open, onClose, name, type])
+      if (e.key === "Escape") onClose();
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "enter")
+        handleSave();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose, name, type]);
 
   const CurrentIcon =
-    NODE_TYPES.find((t) => t.value === type)?.icon || HelpCircle
+    NODE_TYPES.find((t) => t.value === type)?.icon || HelpCircle;
 
   return (
     <Dialog open={open} onClose={onClose} className="fixed inset-0 z-50">
@@ -113,7 +115,7 @@ export default function NodeModal({ open, onClose, node, refresh }: Props) {
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-white/10">
             <Dialog.Title className="truncate text-xl font-semibold tracking-tight">
-              Edit Node
+              {t("nodemodal_edit_node")}
             </Dialog.Title>
           </div>
 
@@ -121,11 +123,11 @@ export default function NodeModal({ open, onClose, node, refresh }: Props) {
           <div className="p-6 space-y-4">
             <div>
               <label className="mb-2 block text-xs uppercase tracking-wider text-white/60">
-                Name
+                {t("nodemodal_name")}
               </label>
               <Input
                 autoFocus
-                placeholder="Node name"
+                placeholder={t("nodemodal_name_placeholder")}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="h-10"
@@ -134,7 +136,7 @@ export default function NodeModal({ open, onClose, node, refresh }: Props) {
 
             <div>
               <label className="mb-2 block text-xs uppercase tracking-wider text-white/60">
-                Type
+                {t("nodemodal_type")}
               </label>
               <div className="flex items-center gap-2">
                 <select
@@ -142,16 +144,16 @@ export default function NodeModal({ open, onClose, node, refresh }: Props) {
                   onChange={(e) => setType(e.target.value)}
                   className="h-10 flex-1 rounded-lg bg-zinc-900 px-3 text-sm text-white outline-none border border-white/10 focus:ring-2 focus:ring-white/20"
                 >
-                  {NODE_TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
+                  {NODE_TYPES.map((tObj) => (
+                    <option key={tObj.value} value={tObj.value}>
+                      {tObj.label}
                     </option>
                   ))}
                 </select>
                 <CurrentIcon className="h-5 w-5 text-white/70" />
               </div>
               <p className="mt-1 text-xs text-white/50">
-                Examples: {NODE_HINTS[type]}
+                {t("nodemodal_examples")}: {NODE_HINTS[type]}
               </p>
             </div>
           </div>
@@ -163,7 +165,7 @@ export default function NodeModal({ open, onClose, node, refresh }: Props) {
                 onClick={tryDelete}
                 className="h-10 inline-flex items-center justify-center rounded-md border border-red-500/50 px-4 text-red-300 hover:text-red-200 hover:border-red-400 transition"
               >
-                Delete Node
+                {t("nodemodal_delete_node")}
               </button>
 
               <div className="flex gap-2">
@@ -171,23 +173,25 @@ export default function NodeModal({ open, onClose, node, refresh }: Props) {
                   onClick={onClose}
                   className="h-10 rounded-md border border-white/10 px-4 text-white hover:text-gray-300"
                 >
-                  Cancel
+                  {t("nodemodal_cancel")}
                 </button>
                 <Button
                   onClick={handleSave}
                   disabled={!valid || !dirty || saving}
                   className="h-10 min-w-[96px]"
                 >
-                  {saving ? 'Saving...' : 'Save'}
+                  {saving ? t("nodemodal_saving") : t("nodemodal_save")}
                 </Button>
               </div>
             </div>
 
-            {typeof connectedCount === 'number' && connectedCount > 0 && (
+            {typeof connectedCount === "number" && connectedCount > 0 && (
               <div className="mt-2 text-xs text-red-300">
-                {connectedCount} link
-                {connectedCount === 1 ? '' : 's'} connected to this node will
-                be affected.
+                {connectedCount === 1
+                  ? t("nodemodal_links_affected_single")
+                  : t("nodemodal_links_affected_multi", {
+                      count: String(connectedCount),
+                    })}
               </div>
             )}
           </div>
@@ -204,36 +208,38 @@ export default function NodeModal({ open, onClose, node, refresh }: Props) {
         <div className="fixed inset-0 flex items-center justify-center p-4">
           <Dialog.Panel className="w-full max-w-md space-y-4 rounded-xl border border-white/10 bg-zinc-950 p-6 text-white">
             <Dialog.Title className="text-lg font-semibold">
-              Delete Node?
+              {t("nodemodal_delete_node_title")}
             </Dialog.Title>
             <p className="text-sm text-white/80">
-              You are about to delete <b>{name || 'this node'}</b>.
-              {typeof connectedCount === 'number' && connectedCount > 0 ? (
+              {t("nodemodal_delete_node_msg")} <b>{name || "this node"}</b>.{" "}
+              {typeof connectedCount === "number" && connectedCount > 0 ? (
                 <>
-                  {' '}
-                  This will also affect <b>{connectedCount}</b> connected link
-                  {connectedCount === 1 ? '' : 's'}.
+                  {connectedCount === 1
+                    ? t("nodemodal_links_affected_single")
+                    : t("nodemodal_links_affected_multi", {
+                        count: String(connectedCount),
+                      })}
                 </>
-              ) : null}{' '}
-              This action cannot be undone.
+              ) : null}{" "}
+              {t("nodemodal_delete_warning")}
             </p>
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setConfirmDeleteOpen(false)}
                 className="h-10 rounded-md border border-white/10 px-4 text-white hover:text-gray-300"
               >
-                Cancel
+                {t("nodemodal_cancel")}
               </button>
               <Button
                 onClick={handleDeleteConfirmed}
                 className="h-10 bg-red-600 hover:bg-red-700"
               >
-                Delete Anyway
+                {t("nodemodal_delete_anyway")}
               </Button>
             </div>
           </Dialog.Panel>
         </div>
       </Dialog>
     </Dialog>
-  )
+  );
 }
