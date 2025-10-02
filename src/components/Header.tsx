@@ -41,8 +41,11 @@ export default function Header() {
     <header className="fixed top-0 left-0 right-0 z-20 border-b border-neutral-800 bg-black/80 backdrop-blur-sm">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
         {/* Left: Logo */}
-        <Link href="/" className="font-semibold">
+        <Link href="/" className="font-semibold flex items-center gap-2">
           Papaya
+          <span className="rounded-full bg-yellow-500/20 px-2 py-0.5 text-[10px] font-medium text-yellow-400 border border-yellow-500/40">
+            Beta
+          </span>
         </Link>
 
         {/* Center: Navigation */}

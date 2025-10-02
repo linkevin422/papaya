@@ -240,7 +240,32 @@
   "edgemodal_confirm_delete": "Confirm delete",
   "edgemodal_master_currency": "Master currency",
   "edgemodal_traffic_no_entries": "Traffic link, no monetary entries.",
-  "edgemodal_close": "Close"
+  "edgemodal_close": "Close",
+
+    "nodemodal_type_pocket": "Pocket",
+    "nodemodal_type_platform": "Platform",
+    "nodemodal_type_people": "People",
+    "nodemodal_type_portfolio": "Portfolio",
+    "nodemodal_type_other": "Other",
+  
+    "nodemodal_hint_pocket": "Cash, Bank Account, PayPal",
+    "nodemodal_hint_platform": "Shopee, YouTube, Stripe",
+    "nodemodal_hint_people": "Employer, Client, Sponsor",
+    "nodemodal_hint_portfolio": "ETF, Crypto Wallet, Royalties",
+    "nodemodal_hint_other": "Anything else",
+
+      "addnode_type_pocket": "Pocket",
+  "addnode_type_platform": "Platform",
+  "addnode_type_people": "People",
+  "addnode_type_portfolio": "Portfolio",
+  "addnode_type_other": "Other",
+
+  "footer_terms": "Terms",
+  "footer_privacy": "Privacy & Cookies",
+  "footer_refund": "Refund & Cancellation",
+  "footer_disclaimer": "Disclaimer",
+  "footer_contact": "Contact"
+
 
 }
   

@@ -17,31 +17,31 @@ type Props = {
 const NODE_TYPES = [
   {
     value: "Pocket",
-    label: "Pocket",
+    labelKey: "addnode_type_pocket",
     icon: Wallet,
     hintKey: "addnode_type_hint_pocket",
   },
   {
     value: "Platform",
-    label: "Platform",
+    labelKey: "addnode_type_platform",
     icon: Globe,
     hintKey: "addnode_type_hint_platform",
   },
   {
     value: "People",
-    label: "People",
+    labelKey: "addnode_type_people",
     icon: Users,
     hintKey: "addnode_type_hint_people",
   },
   {
     value: "Portfolio",
-    label: "Portfolio",
+    labelKey: "addnode_type_portfolio",
     icon: Briefcase,
     hintKey: "addnode_type_hint_portfolio",
   },
   {
     value: "Other",
-    label: "Other",
+    labelKey: "addnode_type_other",
     icon: HelpCircle,
     hintKey: "addnode_type_hint_other",
   },
@@ -138,7 +138,7 @@ export default function AddNodeForm({ flowId, userId, onNodeAdded }: Props) {
           >
             {NODE_TYPES.map((tObj) => (
               <option key={tObj.value} value={tObj.value}>
-                {tObj.label}
+                {t(tObj.labelKey)}
               </option>
             ))}
           </select>

@@ -16,19 +16,19 @@ type Props = {
 };
 
 const NODE_TYPES = [
-  { value: "Pocket", label: "Pocket", icon: Wallet },
-  { value: "Platform", label: "Platform", icon: Globe },
-  { value: "People", label: "People", icon: Users },
-  { value: "Portfolio", label: "Portfolio", icon: Briefcase },
-  { value: "Other", label: "Other", icon: HelpCircle },
+  { value: "Pocket", icon: Wallet },
+  { value: "Platform", icon: Globe },
+  { value: "People", icon: Users },
+  { value: "Portfolio", icon: Briefcase },
+  { value: "Other", icon: HelpCircle },
 ];
 
 const NODE_HINTS: Record<string, string> = {
-  Pocket: "Cash, Bank Account, PayPal",
-  Platform: "Shopee, YouTube, Stripe",
-  People: "Employer, Client, Sponsor",
-  Portfolio: "ETF, Crypto Wallet, Royalties",
-  Other: "Anything else",
+  Pocket: "nodemodal_hint_pocket",
+  Platform: "nodemodal_hint_platform",
+  People: "nodemodal_hint_people",
+  Portfolio: "nodemodal_hint_portfolio",
+  Other: "nodemodal_hint_other",
 };
 
 const supabase = createClient();
@@ -123,19 +123,6 @@ export default function NodeModal({ open, onClose, node, refresh }: Props) {
           <div className="p-6 space-y-4">
             <div>
               <label className="mb-2 block text-xs uppercase tracking-wider text-white/60">
-                {t("nodemodal_name")}
-              </label>
-              <Input
-                autoFocus
-                placeholder={t("nodemodal_name_placeholder")}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="h-10"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-xs uppercase tracking-wider text-white/60">
                 {t("nodemodal_type")}
               </label>
               <div className="flex items-center gap-2">
@@ -146,14 +133,14 @@ export default function NodeModal({ open, onClose, node, refresh }: Props) {
                 >
                   {NODE_TYPES.map((tObj) => (
                     <option key={tObj.value} value={tObj.value}>
-                      {tObj.label}
+                      {t(`nodemodal_type_${tObj.value.toLowerCase()}`)}
                     </option>
                   ))}
                 </select>
                 <CurrentIcon className="h-5 w-5 text-white/70" />
               </div>
               <p className="mt-1 text-xs text-white/50">
-                {t("nodemodal_examples")}: {NODE_HINTS[type]}
+                {t("nodemodal_examples")}: {t(NODE_HINTS[type])}
               </p>
             </div>
           </div>

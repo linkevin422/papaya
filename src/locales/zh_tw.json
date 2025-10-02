@@ -242,6 +242,30 @@
   "edgemodal_confirm_delete": "確認刪除",
   "edgemodal_master_currency": "主幣別",
   "edgemodal_traffic_no_entries": "流量連結，沒有金額紀錄。",
-  "edgemodal_close": "關閉"
+  "edgemodal_close": "關閉",
+
+  "nodemodal_type_pocket": "金庫",
+  "nodemodal_type_platform": "平台",
+  "nodemodal_type_people": "人",
+  "nodemodal_type_portfolio": "投資",
+  "nodemodal_type_other": "其他",
+
+  "nodemodal_hint_pocket": "現金、銀行帳戶、PayPal",
+  "nodemodal_hint_platform": "蝦皮、YouTube、Stripe",
+  "nodemodal_hint_people": "雇主、客戶、贊助者",
+  "nodemodal_hint_portfolio": "ETF、加密錢包、版稅",
+  "nodemodal_hint_other": "其他類型",
+
+  "addnode_type_pocket": "金庫",
+  "addnode_type_platform": "平台",
+  "addnode_type_people": "人",
+  "addnode_type_portfolio": "投資",
+  "addnode_type_other": "其他",
+
+  "footer_terms": "服務條款",
+  "footer_privacy": "隱私與 Cookie",
+  "footer_refund": "退款與取消",
+  "footer_disclaimer": "免責聲明",
+  "footer_contact": "聯絡我們"
 }
   
