@@ -226,8 +226,13 @@ export default function EdgeModal({
       recurring_interval: e.recurring_interval,
     }));
 
-    const totals = calculateFlows(normalized, masterCurrency, r);
-    setFlows(totals);
+    const hasRecurring = normalized.some((e) => !!e.recurring_interval);
+    if (normalized.length < 2 && !hasRecurring) {
+      setFlows(null);
+    } else {
+      const totals = calculateFlows(normalized, masterCurrency, r);
+      setFlows(totals);
+    }
 
     setLoadingRecurring(false);
   }, [edge.id, masterCurrency, effectiveRates]);

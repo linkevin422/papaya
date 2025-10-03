@@ -59,6 +59,7 @@ type EdgeData = {
   monthly_flow?: number | null;
   yearly_flow?: number | null;
   entries_count?: number | null;
+  entries?: Entry[]; // ✅ add this
 };
 
 const EDGE_COLOR: Record<string, string> = {
@@ -225,8 +226,9 @@ export default function FlowPage() {
         };
       });
 
+      const hasRecurring = normalized.some((e) => !!e.recurring_interval);
       const flows =
-        normalized.length > 0
+        normalized.length >= 2 || hasRecurring
           ? calculateFlows(normalized, masterCurrency, rates)
           : { daily: 0, monthly: 0, yearly: 0 };
 
@@ -405,7 +407,12 @@ export default function FlowPage() {
 
       const shouldShow =
         e.show_amount !== false && showAmountsForViewer && !isExcluded;
-      const hasEnough = (e.entries_count ?? 0) >= 1;
+
+      // show if ≥2 entries OR at least one recurring
+      const hasRecurring =
+        Array.isArray(e.entries) &&
+        e.entries.some((entry: any) => !!entry.recurring_interval);
+      const hasEnough = (e.entries_count ?? 0) >= 2 || hasRecurring;
 
       let amountText: string | null = null;
       if (shouldShow && hasEnough && typeof val === "number" && isFinite(val)) {

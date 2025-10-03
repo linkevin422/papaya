@@ -50,10 +50,12 @@ export function calculateFlows(
 ): FlowTotals {
   const safeRates = { ...rates, [masterCurrency]: 1 }
 
-  if (entries.length === 0) {
-    return { daily: 0, monthly: 0, yearly: 0 }
-  }
-
+// allow single recurring entry, but require ≥2 for non-recurring
+const hasRecurring = entries.some((e) => !!e.recurring_interval);
+if (entries.length < 2 && !hasRecurring) {
+  return { daily: 0, monthly: 0, yearly: 0 };
+}
+  
   // normalize all entries
   const normalized = entries
     .map((e) => ({
@@ -99,30 +101,18 @@ export function calculateFlows(
   }
   
   // handle non-recurring entries
-  const nonRecDates = Object.keys(dateTotals)
-  const nonRecTotal = Object.values(dateTotals).reduce((a, b) => a + b, 0)
+// handle non-recurring entries as historical fixed payments
+const nonRecDates = Object.keys(dateTotals)
+const nonRecValues = Object.values(dateTotals)
 
-  if (nonRecDates.length > 0) {
-    const parsedDates = nonRecDates
-      .filter((d) => d !== 'unknown')
-      .map((d) => new Date(d).getTime())
-
-    if (parsedDates.length > 0) {
-      const minDate = Math.min(...parsedDates)
-      const maxDate = Math.max(...parsedDates)
-      const spanDays = Math.max(
-        1,
-        Math.floor((maxDate - minDate) / (1000 * 60 * 60 * 24)) + 1
-      )
-      daily += nonRecTotal / spanDays
-      monthly += (nonRecTotal / spanDays) * 30
-      yearly += (nonRecTotal / spanDays) * 365
-    } else {
-      daily += nonRecTotal
-      monthly += nonRecTotal * 30
-      yearly += nonRecTotal * 365
-    }
-  }
+if (nonRecValues.length > 0) {
+  // average the amounts (treat each as one monthly bill)
+  const avgMonthly = nonRecValues.reduce((a, b) => a + b, 0) / nonRecValues.length
+  
+  monthly += avgMonthly
+  daily += avgMonthly / 30
+  yearly += avgMonthly * 12
+}
 
   return { daily, monthly, yearly }
 }
