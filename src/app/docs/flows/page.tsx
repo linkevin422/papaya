@@ -1,39 +1,39 @@
-'use client'
+"use client";
 
-import { useLanguage } from '@/context/LanguageProvider'
+import { useLanguage } from "@/context/LanguageProvider";
 
 export default function FlowsDocsPage() {
-  const { t } = useLanguage()
+  const { t } = useLanguage();
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-16 text-neutral-100 space-y-12">
       {/* Title + Intro */}
       <section>
         <h1 className="text-3xl md:text-4xl font-extrabold mb-4">
-          {t('docs.flows.title')}
+          {t("docs.flows.title")}
         </h1>
         <p className="text-lg text-neutral-300 leading-relaxed">
-          {t('docs.flows.intro')}
+          {t("docs.flows.intro")}
         </p>
       </section>
 
       {/* Active vs Passive */}
       <section>
         <h2 className="text-2xl font-bold mb-3">
-          {t('docs.flows.active_vs_passive.title')}
+          {t("docs.flows.active_vs_passive.title")}
         </h2>
         <ul className="list-disc list-inside space-y-2 text-neutral-300">
           <li>
             <span className="font-semibold text-white">
-              {t('docs.flows.active_label')}
-            </span>{' '}
-            {t('docs.flows.active_vs_passive.active')}
+              {t("docs.flows.active_label")}
+            </span>{" "}
+            {t("docs.flows.active_vs_passive.active")}
           </li>
           <li>
             <span className="font-semibold text-white">
-              {t('docs.flows.passive_label')}
-            </span>{' '}
-            {t('docs.flows.active_vs_passive.passive')}
+              {t("docs.flows.passive_label")}
+            </span>{" "}
+            {t("docs.flows.active_vs_passive.passive")}
           </li>
         </ul>
       </section>
@@ -41,29 +41,39 @@ export default function FlowsDocsPage() {
       {/* Nodes */}
       <section>
         <h2 className="text-2xl font-bold mb-3">
-          {t('docs.flows.nodes.title')}
+          {t("docs.flows.nodes.title")}
         </h2>
-        <p className="text-neutral-300 mb-4">{t('docs.flows.nodes.desc')}</p>
+        <p className="text-neutral-300 mb-4">{t("docs.flows.nodes.desc")}</p>
         <ul className="space-y-2 text-neutral-300">
           <li>
-            <span className="font-semibold text-white">Pocket:</span>{' '}
-            {t('docs.flows.nodes.types.pocket')}
+            <span className="font-semibold text-white">
+              {t("nodemodal_type_pocket")}：
+            </span>
+            {t("docs.flows.nodes.types.pocket")}
           </li>
           <li>
-            <span className="font-semibold text-white">Platform:</span>{' '}
-            {t('docs.flows.nodes.types.platform')}
+            <span className="font-semibold text-white">
+              {t("nodemodal_type_platform")}：
+            </span>
+            {t("docs.flows.nodes.types.platform")}
           </li>
           <li>
-            <span className="font-semibold text-white">People:</span>{' '}
-            {t('docs.flows.nodes.types.people')}
+            <span className="font-semibold text-white">
+              {t("nodemodal_type_people")}：
+            </span>
+            {t("docs.flows.nodes.types.people")}
           </li>
           <li>
-            <span className="font-semibold text-white">Portfolio:</span>{' '}
-            {t('docs.flows.nodes.types.portfolio')}
+            <span className="font-semibold text-white">
+              {t("nodemodal_type_portfolio")}：
+            </span>
+            {t("docs.flows.nodes.types.portfolio")}
           </li>
           <li>
-            <span className="font-semibold text-white">Other:</span>{' '}
-            {t('docs.flows.nodes.types.other')}
+            <span className="font-semibold text-white">
+              {t("nodemodal_type_other")}：
+            </span>
+            {t("docs.flows.nodes.types.other")}
           </li>
         </ul>
       </section>
@@ -71,34 +81,38 @@ export default function FlowsDocsPage() {
       {/* Links */}
       <section>
         <h2 className="text-2xl font-bold mb-3">
-          {t('docs.flows.links.title')}
+          {t("docs.flows.links.title")}
         </h2>
-        <p className="text-neutral-300 mb-4">{t('docs.flows.links.desc')}</p>
+        <p className="text-neutral-300 mb-4">{t("docs.flows.links.desc")}</p>
         <ul className="space-y-2 text-neutral-300">
           <li>
-            <span className="font-semibold text-white">Income:</span>{' '}
-            {t('docs.flows.links.types.income')}
+            <span className="font-semibold text-white">
+              {t("edgemodal_income")}：
+            </span>
+            {t("docs.flows.links.types.income")}
           </li>
           <li>
-            <span className="font-semibold text-white">Fuel:</span>{' '}
-            {t('docs.flows.links.types.fuel')}
+            <span className="font-semibold text-white">
+              {t("edgemodal_fuel")}：
+            </span>
+            {t("docs.flows.links.types.fuel")}
           </li>
           <li>
-            <span className="font-semibold text-white">Traffic:</span>{' '}
-            {t('docs.flows.links.types.traffic')}
+            <span className="font-semibold text-white">
+              {t("edgemodal_traffic")}：
+            </span>
+            {t("docs.flows.links.types.traffic")}
           </li>
         </ul>
       </section>
 
       {/* Why */}
       <section>
-        <h2 className="text-2xl font-bold mb-3">
-          {t('docs.flows.why.title')}
-        </h2>
+        <h2 className="text-2xl font-bold mb-3">{t("docs.flows.why.title")}</h2>
         <p className="text-neutral-300 leading-relaxed">
-          {t('docs.flows.why.text')}
+          {t("docs.flows.why.text")}
         </p>
       </section>
     </div>
-  )
+  );
 }
