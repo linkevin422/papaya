@@ -93,6 +93,9 @@ export default function FlowPage() {
 
   const [nodes, setNodes] = useState<NodeData[]>([]);
   const [edges, setEdges] = useState<EdgeData[]>([]);
+
+  // loading screen
+  const [loading, setLoading] = useState(true);
   const [selectedNode, setSelectedNode] = useState<NodeData | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<EdgeData | null>(null);
   const [showAddNode, setShowAddNode] = useState(false);
@@ -269,7 +272,8 @@ export default function FlowPage() {
 
   useEffect(() => {
     if (!urlParam) return;
-    fetchFlow();
+    setLoading(true);
+    fetchFlow().finally(() => setTimeout(() => setLoading(false), 400));
   }, [urlParam]);
 
   useEffect(() => {
@@ -460,6 +464,18 @@ export default function FlowPage() {
     yearly,
     t,
   ]);
+
+  if (loading) {
+    return (
+      <main className="fixed inset-0 flex items-center justify-center bg-black text-white z-50 transition-opacity duration-500">
+        <img
+          src="/logo/logo.png"
+          alt="Papaya logo"
+          className="w-20 h-20 animate-pulse opacity-90"
+        />
+      </main>
+    );
+  }
 
   if (notFound) {
     return (

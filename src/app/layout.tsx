@@ -1,15 +1,15 @@
-'use client'
+"use client";
 
-import './globals.css'
-import { LanguageProvider } from '@/context/LanguageProvider'
-import { ProfileProvider } from '@/context/ProfileProvider'
-import Header from '@/components/Header'
-import Footer from '@/components/Footer'
+import "./globals.css";
+import { LanguageProvider } from "@/context/LanguageProvider";
+import { ProfileProvider } from "@/context/ProfileProvider";
+import Header from "@/components/Header";
+import Footer from "@/components/Footer";
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
   return (
     <html lang="en">
@@ -19,8 +19,18 @@ export default function RootLayout({
 
         {/* Favicons */}
         <link rel="icon" href="/favicon.ico" sizes="any" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png" />
+        <link
+          rel="icon"
+          type="image/png"
+          sizes="16x16"
+          href="/icons/favicon-16x16.png"
+        />
+        <link
+          rel="icon"
+          type="image/png"
+          sizes="32x32"
+          href="/icons/favicon-32x32.png"
+        />
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
         <link rel="manifest" href="/icons/site.webmanifest" />
 
@@ -44,5 +54,5 @@ export default function RootLayout({
         </LanguageProvider>
       </body>
     </html>
-  )
+  );
 }
