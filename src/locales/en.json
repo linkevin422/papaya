@@ -265,7 +265,9 @@
   "footer_privacy": "Privacy & Cookies",
   "footer_refund": "Refund & Cancellation",
   "footer_disclaimer": "Disclaimer",
-  "footer_contact": "Contact"
+  "footer_contact": "Contact",
+
+  "go_to_flows": "Go To My Flows"
 
 
 }

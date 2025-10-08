@@ -19,10 +19,16 @@ export async function POST(req: Request) {
 
     if (createErr || !userData?.user) {
       console.error('Create user error:', createErr)
-      return NextResponse.json({ error: createErr?.message || 'createUser failed' }, { status: 400 })
+      return NextResponse.json(
+        { error: createErr?.message || 'createUser failed' },
+        { status: 400 }
+      )
     }
 
     const user = userData.user
+
+    // 🔹 small delay to let Supabase commit the user before profile insert
+    await new Promise((r) => setTimeout(r, 400))
 
     // 1.5) ✅ Upsert profile NOW with service role (bypasses RLS)
     const { error: upsertErr } = await supabaseAdmin
@@ -33,7 +39,8 @@ export async function POST(req: Request) {
           email: user.email ?? email,
           name: user.user_metadata?.name ?? name,
           handle: user.user_metadata?.handle ?? handle,
-          master_currency: user.user_metadata?.master_currency ?? master_currency ?? 'USD',
+          master_currency:
+            user.user_metadata?.master_currency ?? master_currency ?? 'USD',
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'id' }
@@ -41,7 +48,10 @@ export async function POST(req: Request) {
 
     if (upsertErr) {
       console.error('Profile upsert (register) failed:', upsertErr)
-      return NextResponse.json({ error: upsertErr.message || 'profile upsert failed' }, { status: 500 })
+      return NextResponse.json(
+        { error: upsertErr.message || 'profile upsert failed' },
+        { status: 500 }
+      )
     }
 
     // 2) Generate confirmation link
@@ -54,7 +64,10 @@ export async function POST(req: Request) {
 
     if (linkErr || !linkData?.properties?.action_link) {
       console.error('Link error:', linkErr)
-      return NextResponse.json({ error: linkErr?.message || 'generateLink failed' }, { status: 400 })
+      return NextResponse.json(
+        { error: linkErr?.message || 'generateLink failed' },
+        { status: 400 }
+      )
     }
 
     const confirmUrl = linkData.properties.action_link
@@ -70,12 +83,18 @@ export async function POST(req: Request) {
 
     if (emailErr) {
       console.error('Resend error:', emailErr)
-      return NextResponse.json({ error: emailErr.message || 'resend failed' }, { status: 500 })
+      return NextResponse.json(
+        { error: emailErr.message || 'resend failed' },
+        { status: 500 }
+      )
     }
 
     return NextResponse.json({ success: true, id: emailData?.id })
   } catch (err: any) {
     console.error('Register route fatal:', err)
-    return NextResponse.json({ error: err.message || 'Unexpected error' }, { status: 500 })
+    return NextResponse.json(
+      { error: err.message || 'Unexpected error' },
+      { status: 500 }
+    )
   }
 }

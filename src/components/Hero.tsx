@@ -20,12 +20,18 @@ export default function Hero() {
       >
         {t("learn_more")}
       </Link>
-      <div className="mt-10">
+      <div className="mt-10 flex flex-col items-center gap-3">
         <Link
           href="/register"
           className="bg-white text-black text-sm font-semibold px-6 py-3 rounded-full hover:bg-gray-200 transition"
         >
           {t("get_started")}
+        </Link>
+        <Link
+          href="/dashboard"
+          className="text-sm text-gray-400 hover:text-white underline transition"
+        >
+          {t("go_to_flows", { defaultValue: "前往我的 Flows" })}
         </Link>
       </div>
     </section>
