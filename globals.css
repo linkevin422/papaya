@@ -1,8 +1,40 @@
 @import "tailwindcss/preflight";
 @import "tailwindcss/utilities";
 
+/* Base reset & layout */
+html {
+  @apply scroll-smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  touch-action: manipulation;
+}
+
 body {
-  font-family: sans-serif;
-  background-color: black;
-  color: white;
+  @apply bg-black text-white antialiased;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  min-height: 100dvh; /* fills screen on mobile */
+  overflow-x: hidden; /* stops horizontal drift */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Make media scale correctly */
+img,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Remove the blue highlight on tap */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Hide scrollbars when needed */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

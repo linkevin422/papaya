@@ -52,12 +52,11 @@ export default function AddNodeForm({ flowId, userId, onNodeAdded }: Props) {
   const { t } = useLanguage();
 
   const [name, setName] = useState("");
-  const [type, setType] = useState<string>(NODE_TYPES[0].value); // default to first
+  const [type, setType] = useState<string>(NODE_TYPES[0].value);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [touched, setTouched] = useState(false);
 
-  // derived validity
   const nameClean = useMemo(() => name.trim(), [name]);
   const valid =
     nameClean.length > 0 && NODE_TYPES.some((t) => t.value === type);
@@ -70,7 +69,6 @@ export default function AddNodeForm({ flowId, userId, onNodeAdded }: Props) {
     e.preventDefault();
     setTouched(true);
     if (!valid) return;
-
     setLoading(true);
     setError(null);
 
@@ -92,13 +90,17 @@ export default function AddNodeForm({ flowId, userId, onNodeAdded }: Props) {
     }
 
     setName("");
-    setType(NODE_TYPES[0].value); // reset to default
+    setType(NODE_TYPES[0].value);
     setLoading(false);
     onNodeAdded();
   };
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="w-full space-y-5">
+    <form
+      onSubmit={handleSubmit}
+      noValidate
+      className="w-full max-w-md mx-auto space-y-5 px-3 sm:px-0 py-2 sm:py-0 overflow-y-auto max-h-[80dvh]"
+    >
       {/* Name */}
       <div className="space-y-2">
         <Label
@@ -114,11 +116,11 @@ export default function AddNodeForm({ flowId, userId, onNodeAdded }: Props) {
           onChange={(e) => setName(e.target.value)}
           placeholder={t("addnode_name_placeholder")}
           aria-invalid={touched && !nameClean ? "true" : "false"}
-          className="h-10"
+          className="h-10 bg-zinc-900 border-white/10 text-sm text-white"
         />
-        {touched && !nameClean ? (
+        {touched && !nameClean && (
           <p className="text-xs text-red-300">{t("addnode_name_error")}</p>
-        ) : null}
+        )}
       </div>
 
       {/* Type */}
@@ -145,7 +147,9 @@ export default function AddNodeForm({ flowId, userId, onNodeAdded }: Props) {
           {(() => {
             const CurrentIcon =
               NODE_TYPES.find((t) => t.value === type)?.icon || HelpCircle;
-            return <CurrentIcon className="h-5 w-5 text-white/70" />;
+            return (
+              <CurrentIcon className="h-5 w-5 text-white/70 flex-shrink-0" />
+            );
           })()}
         </div>
         <p className="mt-1 text-xs text-white/50">
@@ -153,7 +157,7 @@ export default function AddNodeForm({ flowId, userId, onNodeAdded }: Props) {
         </p>
       </div>
 
-      {/* Errors */}
+      {/* Error */}
       {error && (
         <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
           {error}
@@ -161,11 +165,11 @@ export default function AddNodeForm({ flowId, userId, onNodeAdded }: Props) {
       )}
 
       {/* Actions */}
-      <div className="flex items-center justify-end">
+      <div className="flex flex-col sm:flex-row justify-end gap-2">
         <Button
           type="submit"
           disabled={!valid || loading}
-          className="h-10 min-w-[110px]"
+          className="h-10 w-full sm:w-auto"
         >
           {loading ? t("addnode_button_adding") : t("addnode_button_add")}
         </Button>

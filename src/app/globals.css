@@ -1,5 +1,6 @@
 @import "tailwindcss";
 
+/* color variables */
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -12,6 +13,7 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* dark mode auto */
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
@@ -19,8 +21,41 @@
   }
 }
 
+/* base layout adjustments for mobile */
+html {
+  @apply scroll-smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  touch-action: manipulation;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  @apply antialiased;
+  min-height: 100dvh; /* fits iOS/Android viewports */
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* tap + media handling */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+img,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+/* optional scrollbar hide */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

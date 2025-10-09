@@ -487,13 +487,14 @@ export default function FlowPage() {
     );
   }
 
+  // ✅ Mobile-optimized main layout
   return (
-    <main className="relative flex justify-center w-full text-white">
-      <div className="w-full max-w-6xl rounded-2xl border border-white/10 bg-black/40 backdrop-blur">
+    <main className="relative flex justify-center w-full text-white min-h-dvh pt-14 pb-[calc(5rem+env(safe-area-inset-bottom))] bg-black overflow-y-auto">
+      <div className="w-full max-w-6xl rounded-none sm:rounded-2xl border border-white/10 bg-black/40 backdrop-blur-sm">
         {/* Header */}
         <div className="sticky top-0 z-30 bg-black/50 backdrop-blur supports-[backdrop-filter]:bg-black/30">
-          <div className="mx-auto max-w-6xl px-4 py-4">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
+          <div className="mx-auto max-w-6xl px-3 sm:px-4 py-3 sm:py-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_auto] sm:items-center">
               <div className="min-w-0">
                 {isOwner ? (
                   <div className="flex items-center gap-2">
@@ -619,8 +620,8 @@ export default function FlowPage() {
                       className="fixed inset-0 z-50"
                     >
                       <div className="fixed inset-0 bg-black/70" />
-                      <div className="fixed inset-0 flex items-center justify-center p-4">
-                        <Dialog.Panel className="w-full max-w-md rounded-2xl border border-white/10 bg-zinc-950 p-6 text-white">
+                      <div className="fixed inset-0 flex items-center justify-center p-2 sm:p-4">
+                        <Dialog.Panel className="w-full max-w-md sm:max-w-lg rounded-xl sm:rounded-2xl border border-white/10 bg-zinc-950 p-5 sm:p-6 text-white">
                           <Dialog.Title className="mb-4 text-lg font-semibold">
                             {t("flowpage_flowVisibility")}
                           </Dialog.Title>
@@ -766,8 +767,8 @@ export default function FlowPage() {
           className="fixed inset-0 z-50"
         >
           <div className="fixed inset-0 bg-black/70" />
-          <div className="fixed inset-0 flex items-center justify-center p-4">
-            <Dialog.Panel className="w-full max-w-md rounded-2xl border border-white/10 bg-zinc-950 p-6 text-white">
+          <div className="fixed inset-0 flex items-center justify-center p-2 sm:p-4">
+            <Dialog.Panel className="w-full max-w-md sm:max-w-lg rounded-xl sm:rounded-2xl border border-white/10 bg-zinc-950 p-5 sm:p-6 text-white">
               <Dialog.Title className="mb-4 text-lg font-semibold">
                 {t("flowpage_addNewNode")}
               </Dialog.Title>

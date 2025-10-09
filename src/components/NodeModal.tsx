@@ -39,7 +39,6 @@ export default function NodeModal({ open, onClose, node, refresh }: Props) {
   const [type, setType] = useState<string>(node.type || "Platform");
   const [saving, setSaving] = useState(false);
 
-  // delete confirm
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [connectedCount, setConnectedCount] = useState<number | null>(null);
 
@@ -50,7 +49,6 @@ export default function NodeModal({ open, onClose, node, refresh }: Props) {
 
   useEffect(() => {
     if (!open || !node.id) return;
-    // fetch number of connected edges for delete warning
     const loadConnections = async () => {
       const { count } = await supabase
         .from("edges")
@@ -61,7 +59,6 @@ export default function NodeModal({ open, onClose, node, refresh }: Props) {
     loadConnections();
   }, [open, node.id]);
 
-  // state
   const dirty = useMemo(
     () =>
       name.trim() !== (node.name || "").trim() ||
@@ -70,7 +67,6 @@ export default function NodeModal({ open, onClose, node, refresh }: Props) {
   );
   const valid = name.trim().length > 0;
 
-  // actions
   const handleSave = useCallback(async () => {
     if (!valid || saving) return;
     setSaving(true);
@@ -92,7 +88,6 @@ export default function NodeModal({ open, onClose, node, refresh }: Props) {
     onClose();
   };
 
-  // keyboard shortcuts
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -110,17 +105,23 @@ export default function NodeModal({ open, onClose, node, refresh }: Props) {
   return (
     <Dialog open={open} onClose={onClose} className="fixed inset-0 z-50">
       <div className="fixed inset-0 bg-black/70" />
-      <div className="fixed inset-0 flex items-center justify-center p-4">
-        <Dialog.Panel className="w-full max-w-md rounded-2xl border border-white/10 bg-zinc-950 text-white shadow-2xl">
+      <div className="fixed inset-0 flex items-center justify-center p-2 sm:p-4">
+        <Dialog.Panel className="w-full max-w-sm sm:max-w-md rounded-xl border border-white/10 bg-zinc-950 text-white shadow-2xl max-h-[90dvh] overflow-y-auto">
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-white/10">
-            <Dialog.Title className="truncate text-xl font-semibold tracking-tight">
+          <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-white/10">
+            <Dialog.Title className="truncate text-lg sm:text-xl font-semibold tracking-tight">
               {t("nodemodal_edit_node")}
             </Dialog.Title>
+            <button
+              onClick={onClose}
+              className="text-white/60 hover:text-white transition text-sm sm:text-base"
+            >
+              ✕
+            </button>
           </div>
 
           {/* Body */}
-          <div className="p-6 space-y-4">
+          <div className="px-4 sm:px-6 py-5 space-y-4">
             <div>
               <label className="mb-2 block text-xs uppercase tracking-wider text-white/60">
                 {t("nodemodal_type")}
@@ -137,35 +138,46 @@ export default function NodeModal({ open, onClose, node, refresh }: Props) {
                     </option>
                   ))}
                 </select>
-                <CurrentIcon className="h-5 w-5 text-white/70" />
+                <CurrentIcon className="h-5 w-5 text-white/70 flex-shrink-0" />
               </div>
               <p className="mt-1 text-xs text-white/50">
                 {t("nodemodal_examples")}: {t(NODE_HINTS[type])}
               </p>
             </div>
+
+            <div>
+              <label className="mb-2 block text-xs uppercase tracking-wider text-white/60">
+                {t("nodemodal_name")}
+              </label>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="h-10 bg-zinc-900 border-white/10 text-sm text-white"
+              />
+            </div>
           </div>
 
           {/* Footer */}
-          <div className="p-6 border-t border-white/10">
-            <div className="flex items-center justify-between">
+          <div className="px-4 sm:px-6 py-4 border-t border-white/10">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
               <button
                 onClick={tryDelete}
-                className="h-10 inline-flex items-center justify-center rounded-md border border-red-500/50 px-4 text-red-300 hover:text-red-200 hover:border-red-400 transition"
+                className="h-10 rounded-md border border-red-500/50 px-4 text-red-300 hover:text-red-200 hover:border-red-400 transition w-full sm:w-auto"
               >
                 {t("nodemodal_delete_node")}
               </button>
 
-              <div className="flex gap-2">
+              <div className="flex gap-2 w-full sm:w-auto">
                 <button
                   onClick={onClose}
-                  className="h-10 rounded-md border border-white/10 px-4 text-white hover:text-gray-300"
+                  className="h-10 flex-1 sm:flex-none rounded-md border border-white/10 px-4 text-white hover:text-gray-300"
                 >
                   {t("nodemodal_cancel")}
                 </button>
                 <Button
                   onClick={handleSave}
                   disabled={!valid || !dirty || saving}
-                  className="h-10 min-w-[96px]"
+                  className="h-10 flex-1 sm:flex-none min-w-[90px]"
                 >
                   {saving ? t("nodemodal_saving") : t("nodemodal_save")}
                 </Button>
@@ -173,7 +185,7 @@ export default function NodeModal({ open, onClose, node, refresh }: Props) {
             </div>
 
             {typeof connectedCount === "number" && connectedCount > 0 && (
-              <div className="mt-2 text-xs text-red-300">
+              <div className="mt-3 text-xs text-red-300 text-center sm:text-left">
                 {connectedCount === 1
                   ? t("nodemodal_links_affected_single")
                   : t("nodemodal_links_affected_multi", {
@@ -192,12 +204,12 @@ export default function NodeModal({ open, onClose, node, refresh }: Props) {
         className="fixed inset-0 z-[60]"
       >
         <div className="fixed inset-0 bg-black/80" />
-        <div className="fixed inset-0 flex items-center justify-center p-4">
-          <Dialog.Panel className="w-full max-w-md space-y-4 rounded-xl border border-white/10 bg-zinc-950 p-6 text-white">
-            <Dialog.Title className="text-lg font-semibold">
+        <div className="fixed inset-0 flex items-center justify-center p-2 sm:p-4">
+          <Dialog.Panel className="w-full max-w-sm sm:max-w-md rounded-lg border border-white/10 bg-zinc-950 p-5 sm:p-6 text-white space-y-4 max-h-[90dvh] overflow-y-auto">
+            <Dialog.Title className="text-base sm:text-lg font-semibold">
               {t("nodemodal_delete_node_title")}
             </Dialog.Title>
-            <p className="text-sm text-white/80">
+            <p className="text-sm text-white/80 leading-relaxed">
               {t("nodemodal_delete_node_msg")} <b>{name || "this node"}</b>.{" "}
               {typeof connectedCount === "number" && connectedCount > 0 ? (
                 <>
@@ -210,16 +222,16 @@ export default function NodeModal({ open, onClose, node, refresh }: Props) {
               ) : null}{" "}
               {t("nodemodal_delete_warning")}
             </p>
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-2 flex-wrap">
               <button
                 onClick={() => setConfirmDeleteOpen(false)}
-                className="h-10 rounded-md border border-white/10 px-4 text-white hover:text-gray-300"
+                className="h-10 rounded-md border border-white/10 px-4 text-white hover:text-gray-300 w-full sm:w-auto"
               >
                 {t("nodemodal_cancel")}
               </button>
               <Button
                 onClick={handleDeleteConfirmed}
-                className="h-10 bg-red-600 hover:bg-red-700"
+                className="h-10 bg-red-600 hover:bg-red-700 w-full sm:w-auto"
               >
                 {t("nodemodal_delete_anyway")}
               </Button>

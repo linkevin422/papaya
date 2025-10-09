@@ -398,8 +398,17 @@ export default function EdgeModal({
   return (
     <Dialog open={open} onClose={onClose} className="fixed inset-0 z-50">
       <div className="fixed inset-0 bg-black/70" />
-      <div className="fixed inset-0 flex items-center justify-center p-4">
-        <Dialog.Panel className="bg-zinc-950 text-white w-full max-w-3xl rounded-2xl border border-white/10 shadow-2xl">
+      <div className="fixed inset-0 flex items-center justify-center p-2 sm:p-4">
+        <Dialog.Panel
+          className="
+    bg-zinc-950 text-white w-full max-w-[95vw] sm:max-w-3xl
+    rounded-xl sm:rounded-2xl border border-white/10 shadow-2xl
+    max-h-[92dvh] overflow-y-auto
+    overscroll-contain scrollbar-none
+    [scrollbar-width:none] [-ms-overflow-style:none]
+    [&::-webkit-scrollbar]:hidden
+  "
+        >
           {/* Header */}
           <div className="flex items-start justify-between p-6 border-b border-white/10">
             <div className="min-w-0">
@@ -479,7 +488,7 @@ export default function EdgeModal({
           </div>
 
           {/* Body */}
-          <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+          <div className="p-4 sm:p-6 space-y-6 max-h-[70vh] overflow-y-auto overflow-x-hidden rounded-b-xl bg-black/20 backdrop-blur-md scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             {/* Top meta row */}
             {type !== "Traffic" && (
               <div className="flex flex-wrap items-center gap-2">
@@ -532,7 +541,7 @@ export default function EdgeModal({
             ) : (
               <div className="space-y-4">
                 {/* Add entry row */}
-                <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr_1fr_auto] gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-[150px_1fr_1fr_auto] gap-2 sm:gap-3">
                   <Input
                     type="date"
                     value={newDate}
@@ -928,7 +937,7 @@ export default function EdgeModal({
           </div>
 
           {/* Footer */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-6 border-t border-white/10">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-4 sm:px-6 py-4 border-t border-white/10 bg-black/40 backdrop-blur-md sticky bottom-0">
             <div className="flex items-center gap-2 text-xs text-white/60">
               {type !== "Traffic" ? (
                 <span>

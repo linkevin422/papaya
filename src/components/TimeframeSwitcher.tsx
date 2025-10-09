@@ -20,16 +20,16 @@ export default function TimeframeSwitcher({ viewMode, setViewMode }: Props) {
   };
 
   return (
-    <div className="inline-flex gap-1 rounded-md bg-neutral-900 border border-neutral-800 p-1">
+    <div className="inline-flex gap-1 sm:gap-1.5 rounded-lg bg-neutral-900/80 border border-neutral-800 p-1 overflow-x-auto flex-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {(["daily", "monthly", "yearly"] as ViewMode[]).map((mode) => (
         <button
           key={mode}
           onClick={() => setViewMode(mode)}
           className={cn(
-            "text-xs px-3 py-1.5 rounded-md transition",
+            "text-[11px] sm:text-xs px-3 sm:px-4 py-2 sm:py-1.5 rounded-md transition-colors whitespace-nowrap select-none",
             viewMode === mode
-              ? "bg-white text-black font-medium"
-              : "text-neutral-400 hover:bg-neutral-800"
+              ? "bg-white text-black font-semibold shadow-sm"
+              : "text-neutral-400 hover:text-white hover:bg-neutral-800"
           )}
         >
           {labels[mode]}

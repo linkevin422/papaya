@@ -5,6 +5,7 @@ import { useProfile } from "@/context/ProfileProvider";
 import { useLanguage } from "@/context/LanguageProvider";
 import { createClient } from "@/lib/supabase";
 import { useEffect, useRef, useState } from "react";
+import { Menu, X } from "lucide-react";
 
 export default function Header() {
   const { profile } = useProfile();
@@ -19,14 +20,14 @@ export default function Header() {
   };
 
   useEffect(() => {
-    function handleClick(e: MouseEvent) {
+    const handleClick = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setMenuOpen(false);
       }
-    }
-    function handleEscape(e: KeyboardEvent) {
+    };
+    const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape") setMenuOpen(false);
-    }
+    };
     if (menuOpen) {
       document.addEventListener("mousedown", handleClick);
       document.addEventListener("keydown", handleEscape);
@@ -38,7 +39,7 @@ export default function Header() {
   }, [menuOpen]);
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-20 border-b border-neutral-800 bg-black/80 backdrop-blur-sm">
+    <header className="fixed top-0 left-0 right-0 z-40 border-b border-white/10 bg-black/70 backdrop-blur-md supports-[backdrop-filter]:bg-black/60 transition-all">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
         {/* Left: Logo */}
         <Link href="/" className="font-semibold flex items-center gap-2">
@@ -48,8 +49,8 @@ export default function Header() {
           </span>
         </Link>
 
-        {/* Center: Navigation */}
-        <nav className="flex items-center gap-6">
+        {/* Desktop Nav */}
+        <nav className="hidden md:flex items-center gap-6">
           <Link href="/about" className="text-sm opacity-80 hover:opacity-100">
             {t("about")}
           </Link>
@@ -73,79 +74,108 @@ export default function Header() {
           </Link>
         </nav>
 
-        {/* Right: User / Auth controls */}
-        {profile ? (
-          <div className="relative" ref={menuRef}>
-            <button
-              onClick={() => setMenuOpen((o) => !o)}
-              className="flex items-center gap-2 rounded-lg px-3 py-1.5 hover:bg-neutral-900"
-            >
-              <span className="text-sm">{profile.handle ?? profile.email}</span>
-              <svg
-                className={`h-4 w-4 transition-transform ${
-                  menuOpen ? "rotate-180 opacity-100" : "opacity-70"
-                }`}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                viewBox="0 0 24 24"
+        {/* Right: Auth / Burger */}
+        <div className="flex items-center gap-2">
+          {/* Mobile menu toggle */}
+          <button
+            className="md:hidden p-2 rounded-lg hover:bg-white/10 active:scale-95 transition"
+            onClick={() => setMenuOpen((o) => !o)}
+            aria-label="Toggle menu"
+          >
+            {menuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+
+          {/* Auth controls (desktop) */}
+          <div className="hidden md:flex items-center gap-4">
+            {profile ? (
+              <button
+                onClick={handleLogout}
+                className="text-sm opacity-80 hover:opacity-100"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
-            </button>
-
-            {menuOpen && (
-              <div className="absolute right-0 mt-2 w-52 overflow-hidden rounded-lg border border-neutral-800 bg-neutral-950 shadow-xl">
-                <div className="px-4 py-2 text-sm text-neutral-400 border-b border-neutral-800">
-                  {profile.subscription_level === "pro" ? "Pro" : "Basic"}
-                </div>
-
+                {t("logout")}
+              </button>
+            ) : (
+              <>
                 <Link
-                  href="/dashboard"
-                  className="block px-4 py-2 text-sm hover:bg-neutral-900"
-                  onClick={() => setMenuOpen(false)}
+                  href="/login"
+                  className="text-sm opacity-80 hover:opacity-100"
                 >
-                  {t("dashboard")}
+                  {t("login")}
                 </Link>
-
                 <Link
-                  href={profile ? `/${profile.handle}` : "/login"}
-                  className="block px-4 py-2 text-sm hover:bg-neutral-900"
-                  onClick={() => setMenuOpen(false)}
+                  href="/register"
+                  className="rounded-full bg-white px-4 py-1.5 text-sm font-semibold text-black hover:bg-gray-200"
                 >
-                  {t("my_papaya")}
+                  {t("signup")}
                 </Link>
-
-                <button
-                  onClick={handleLogout}
-                  className="w-full px-4 py-2 text-left text-sm hover:bg-neutral-900"
-                >
-                  {t("logout")}
-                </button>
-              </div>
+              </>
             )}
           </div>
-        ) : (
-          <div className="flex items-center gap-4">
-            <Link
-              href="/login"
-              className="text-sm opacity-80 hover:opacity-100"
-            >
-              {t("login")}
-            </Link>
-            <Link
-              href="/register"
-              className="rounded-full bg-white px-4 py-1.5 text-sm font-semibold text-black hover:bg-gray-200"
-            >
-              {t("signup")}
-            </Link>
-          </div>
-        )}
+        </div>
       </div>
+
+      {/* Mobile Dropdown */}
+      {menuOpen && (
+        <div
+          ref={menuRef}
+          className="md:hidden absolute top-16 left-0 right-0 border-t border-white/10 bg-black/90 backdrop-blur-md flex flex-col items-center gap-5 py-8 animate-in fade-in slide-in-from-top duration-200"
+        >
+          <Link
+            href="/about"
+            onClick={() => setMenuOpen(false)}
+            className="text-sm opacity-90"
+          >
+            {t("about")}
+          </Link>
+          <Link
+            href="/docs/flows"
+            onClick={() => setMenuOpen(false)}
+            className="text-sm opacity-90"
+          >
+            {t("guide")}
+          </Link>
+          <Link
+            href={profile ? `/${profile.handle}` : "/login"}
+            onClick={() => setMenuOpen(false)}
+            className="text-sm opacity-90"
+          >
+            {t("my_papaya")}
+          </Link>
+          <Link
+            href="/pricing"
+            onClick={() => setMenuOpen(false)}
+            className="text-sm opacity-90"
+          >
+            {t("pricing")}
+          </Link>
+
+          {profile ? (
+            <button
+              onClick={handleLogout}
+              className="text-sm opacity-80 hover:opacity-100 mt-2"
+            >
+              {t("logout")}
+            </button>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                onClick={() => setMenuOpen(false)}
+                className="text-sm"
+              >
+                {t("login")}
+              </Link>
+              <Link
+                href="/register"
+                onClick={() => setMenuOpen(false)}
+                className="rounded-full bg-white text-black px-6 py-2 text-sm font-semibold hover:bg-gray-100 shadow-sm transition"
+              >
+                {t("signup")}
+              </Link>
+            </>
+          )}
+        </div>
+      )}
     </header>
   );
 }
